@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "6146405680",
+    "project_id": "anime-trade",
+    "storage_bucket": "anime-trade.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:6146405680:android:c66bdab131e44bf7a6c4f5",
+        "android_client_info": {
+          "package_name": "com.tiosam.anime_trade_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDipHgmFaEUgfxqC0G2XMdTYJjOUqzheIo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
