@@ -8,6 +8,7 @@ class TradePost {
   final String requestItemName;
   final String? description;
   final DateTime createdAt;
+  final String status; // 🔥 Nueva variable para controlar si está activo o cerrado
 
   TradePost({
     required this.id,
@@ -19,11 +20,10 @@ class TradePost {
     required this.requestItemName,
     this.description,
     required this.createdAt,
+    this.status = 'open', // 🔥 Por defecto siempre será 'open'
   });
 
-  // Para convertir de Supabase a Objeto (Lectura)
   factory TradePost.fromJson(Map<String, dynamic> json) {
-    // Nota: Aquí asumimos un JOIN con la tabla 'users' para obtener el perfil
     final profile = json['users'] as Map<String, dynamic>;
 
     return TradePost(
@@ -36,6 +36,7 @@ class TradePost {
       requestItemName: json['request_item'],
       description: json['description'],
       createdAt: DateTime.parse(json['created_at']),
+      status: json['status'] ?? 'open', // 🔥 Leemos el estado desde la DB
     );
   }
 }

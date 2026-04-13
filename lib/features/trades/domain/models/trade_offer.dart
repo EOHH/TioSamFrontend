@@ -1,4 +1,4 @@
-import '../../../home/domain/models/trade_post.dart';
+import 'trade_post.dart';
 
 class TradeOffer {
   final String id;

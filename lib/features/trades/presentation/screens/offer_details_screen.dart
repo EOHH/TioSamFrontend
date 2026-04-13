@@ -5,9 +5,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
 // Importamos el controlador del Home (ruta relativa dentro del mismo feature)
-import '../controllers/home_feed_controller.dart';
+import '../../../profile/presentation/controllers/my_posts_controller.dart';
 // Importamos la pantalla de Trades para acceder a sus providers (cruzando features)
-import '../../../trades/presentation/screens/trades_screen.dart';
+import 'trades_screen.dart';
 
 // 1. EL PROVEEDOR DE DATOS
 final offerDetailsProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, tradeId) async {

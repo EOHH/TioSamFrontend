@@ -9,8 +9,8 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/collection/domain/models/collection_item.dart';
 import '../../features/collection/presentation/screens/collection_detail_screen.dart';
 import '../../features/collection/presentation/screens/collection_screen.dart';
-import '../../features/home/presentation/screens/home_screen.dart';
-import '../../features/home/presentation/screens/offer_details_screen.dart';
+import '../../features/trades/presentation/screens/offer_details_screen.dart';
+import '../../features/market/presentation/screens/market_screen.dart';
 import '../../features/profile/domain/models/user_profile.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
@@ -30,35 +30,32 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/home',
+    initialLocation: '/market', // La puerta de entrada es el Mercado
     redirect: (context, state) {
       final session = ref.read(authRepositoryProvider).currentSession;
       final isAuthRoute = state.matchedLocation == '/login' || state.matchedLocation == '/register';
 
       if (session == null) return isAuthRoute ? null : '/login';
-      if (isAuthRoute) return '/home';
+      if (isAuthRoute) return '/market';
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
 
-      // 👇 RUTA DEL CHAT ACTUALIZADA
       GoRoute(
         path: '/chat/:offerId',
         builder: (context, state) {
           final offerId = state.pathParameters['offerId']!;
-          // Extraemos los datos de la URL (query parameters)
           final contactName = state.uri.queryParameters['name'] ?? 'Coleccionista';
           final contactAvatar = state.uri.queryParameters['avatar'] ?? 'https://ui-avatars.com/api/?name=C';
-          // 👇 NUEVO: Extraemos el ID del contacto
           final contactId = state.uri.queryParameters['contactId'] ?? '';
 
           return ChatScreen(
             offerId: offerId,
             contactName: contactName,
             contactAvatar: contactAvatar,
-            contactId: contactId, // 👇 Se lo pasamos a la pantalla
+            contactId: contactId,
           );
         },
       ),
@@ -84,10 +81,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
+      // 👇 5 RAMAS PERFECTAS
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => MainLayout(navigationShell: navigationShell),
         branches: [
-          StatefulShellBranch(routes: [GoRoute(path: '/home', builder: (context, state) => const HomeScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/market', builder: (context, state) => const MarketScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/trades', builder: (context, state) => const TradesScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/shop', builder: (context, state) => const ShopScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/collection', builder: (context, state) => const CollectionScreen())]),

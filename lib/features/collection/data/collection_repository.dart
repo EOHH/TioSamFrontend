@@ -2,7 +2,7 @@ import 'dart:io'; // IMPORTANTE: Usamos dart:io para File
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/providers/supabase_provider.dart';
-import '../../home/data/storage_repository.dart';
+import '../../trades/data/storage_repository.dart';
 import '../domain/models/collection_item.dart';
 
 class CollectionRepository {

@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import '../../data/trade_repository.dart';
-import '../../domain/models/trade_post.dart';
+import '../../../trades/data/trade_repository.dart';
+import '../../../trades/domain/models/trade_post.dart';
 
 class HomeFeedController extends StateNotifier<AsyncValue<List<TradePost>>> {
   final TradeRepository _repository;

@@ -2,12 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// 1. Proveedor del repositorio
 final marketRepositoryProvider = Provider((ref) {
   return MarketRepository(Supabase.instance.client);
 });
 
-// 2. Proveedor que ejecutará la búsqueda y le dará los datos a la UI
+final categoriesProvider = FutureProvider<List<String>>((ref) async {
+  final repository = ref.watch(marketRepositoryProvider);
+  return await repository.getCategories();
+});
+
 final marketFeedProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final repository = ref.watch(marketRepositoryProvider);
   return await repository.getRecentTrades();
@@ -17,27 +20,35 @@ class MarketRepository {
   final SupabaseClient _supabase;
   MarketRepository(this._supabase);
 
-  // Función para obtener las publicaciones más recientes
+  Future<List<String>> getCategories() async {
+    try {
+      final response = await _supabase
+          .from('categories')
+          .select('name')
+          .order('name', ascending: true);
+
+      return (response as List).map((item) => item['name'] as String).toList();
+    } catch (e) {
+      if (kDebugMode) print('❌ Error en getCategories: $e');
+      throw Exception('Error cargando categorías: $e');
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getRecentTrades() async {
     try {
-      // MAGIA RELACIONAL: Traemos la publicación Y los datos del dueño al mismo tiempo
       final response = await _supabase
           .from('trades')
           .select('''
             *,
-            users!trades_user_id_fkey ( 
+            users ( 
               username,
               avatar_url,
               reputation
             )
           ''')
-      //.eq('status', 'open') // 👈 Descomenta esto si tienes un estatus para ocultar los completados
-          .order('created_at', ascending: false) // Los más nuevos primero
-          .limit(30); // Solo traemos 30 para no saturar el celular
-
-      if (kDebugMode) {
-        print('✅ Mercado cargado: ${response.length} publicaciones encontradas.');
-      }
+          .eq('status', 'open') // 🔥 FILTRO: Solo traemos los tratos que siguen abiertos
+          .order('created_at', ascending: false)
+          .limit(30);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {

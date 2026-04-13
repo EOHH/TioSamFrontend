@@ -5,7 +5,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../controllers/create_trade_controller.dart';
-import '../controllers/home_feed_controller.dart';
+import '../../../profile/presentation/controllers/my_posts_controller.dart';
 import '../../../../core/widgets/custom_input.dart';
 
 class CreateTradeModal extends HookConsumerWidget {

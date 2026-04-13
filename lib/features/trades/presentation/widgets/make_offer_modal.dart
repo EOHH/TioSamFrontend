@@ -3,21 +3,27 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../domain/models/trade_post.dart';
-import '../../../trades/presentation/controllers/create_offer_controller.dart';
+import '../controllers/create_offer_controller.dart';
 import '../../../../core/widgets/custom_input.dart';
 
 class MakeOfferModal extends HookConsumerWidget {
-  final TradePost post;
+  // Ahora pide datos universales en vez del modelo completo
+  final String tradeId;
+  final String ownerUsername;
+  final String offerItemName;
 
-  const MakeOfferModal({super.key, required this.post});
+  const MakeOfferModal({
+    super.key,
+    required this.tradeId,
+    required this.ownerUsername,
+    required this.offerItemName,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final messageController = useTextEditingController();
     final isLoading = ref.watch(createOfferControllerProvider).isLoading;
 
-    // Escuchamos errores para mostrar un SnackBar si la red falla
     ref.listen<AsyncValue<void>>(
       createOfferControllerProvider,
           (previous, next) {
@@ -54,7 +60,7 @@ class MakeOfferModal extends HookConsumerWidget {
             const Text("Proponer Intercambio", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
-              "Estás a punto de hacer una oferta a ${post.username} por su ${post.offerItemName}.",
+              "Estás a punto de hacer una oferta a $ownerUsername por su $offerItemName.",
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
             ),
             const SizedBox(height: 24),
@@ -77,16 +83,13 @@ class MakeOfferModal extends HookConsumerWidget {
                     return;
                   }
 
-                  // 1. Ocultar teclado
                   FocusScope.of(context).unfocus();
 
-                  // 2. Enviar oferta a Supabase
                   final success = await ref.read(createOfferControllerProvider.notifier).sendOffer(
-                      post.id,
+                      tradeId,
                       messageController.text.trim()
                   );
 
-                  // 3. Cerrar modal y avisar si hubo éxito
                   if (success && context.mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(

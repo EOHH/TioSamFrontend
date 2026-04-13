@@ -16,13 +16,21 @@ class MainLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: navigationShell.currentIndex,
         onTap: _onTap,
+        type: BottomNavigationBarType.fixed, // Mantiene los 5 íconos estables
+        backgroundColor: isDarkMode ? const Color(0xFF1E2428) : Colors.white,
+        selectedItemColor: Colors.blueAccent,
+        unselectedItemColor: Colors.grey,
+        selectedFontSize: 12,
+        unselectedFontSize: 10,
         items: const [
-          BottomNavigationBarItem(icon: Icon(LucideIcons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(LucideIcons.compass), label: 'Mercado'),
           BottomNavigationBarItem(icon: Icon(LucideIcons.refreshCw), label: 'Trades'),
           BottomNavigationBarItem(icon: Icon(LucideIcons.shoppingCart), label: 'Tienda'),
           BottomNavigationBarItem(icon: Icon(LucideIcons.library), label: 'Colección'),

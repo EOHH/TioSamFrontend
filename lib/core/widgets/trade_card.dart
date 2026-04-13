@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // ¡Nueva importación!
-import '../../features/home/domain/models/trade_post.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../features/trades/domain/models/trade_post.dart';
 
 class TradeCard extends StatelessWidget {
   final TradePost post;
-  final VoidCallback onTradeTap;
+  final VoidCallback? onTradeTap; // Ahora es opcional
+  final bool showOfferButton; // Nueva variable para controlar la visibilidad del botón
 
   const TradeCard({
     super.key,
     required this.post,
-    required this.onTradeTap,
+    this.onTradeTap,
+    this.showOfferButton = true, // Por defecto siempre se muestra
   });
 
   String _getTimeAgo(DateTime dateTime) {
@@ -58,7 +60,6 @@ class TradeCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  // Cambiamos NetworkImage por CachedNetworkImageProvider
                   backgroundImage: CachedNetworkImageProvider(post.userAvatar),
                   backgroundColor: Theme.of(context).colorScheme.surface,
                 ),
@@ -100,21 +101,23 @@ class TradeCard extends StatelessWidget {
                 _buildItemBox(context, post.requestItemName, null, isOffer: false),
               ],
             ),
-            const SizedBox(height: 20),
 
-            // Botón de Acción
-            SizedBox(
-              width: double.infinity,
-              height: 45,
-              child: ElevatedButton.icon(
-                onPressed: onTradeTap,
-                icon: const Icon(LucideIcons.zap, size: 18),
-                label: const Text('Proponer Intercambio', style: TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            // Botón de Acción (Se oculta completamente si showOfferButton es false)
+            if (showOfferButton) ...[
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 45,
+                child: ElevatedButton.icon(
+                  onPressed: onTradeTap,
+                  icon: const Icon(LucideIcons.zap, size: 18),
+                  label: const Text('Proponer Intercambio', style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
-            )
+            ]
           ],
         ),
       ),
@@ -145,7 +148,6 @@ class TradeCard extends StatelessWidget {
             ),
             image: imageUrl != null && imageUrl.isNotEmpty
                 ? DecorationImage(
-              // Y aquí también lo aplicamos para la foto de la carta
                 image: CachedNetworkImageProvider(imageUrl),
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.2), BlendMode.darken)
