@@ -2,23 +2,25 @@ class ChatMessage {
   final String id;
   final String offerId;
   final String senderId;
-  final String message;
+  final String? message;
+  final String? imageUrl;
+  final String? audioUrl;
+  final bool isRead;
   final DateTime createdAt;
 
   ChatMessage({
     required this.id,
     required this.offerId,
     required this.senderId,
-    required this.message,
+    this.message,
+    this.imageUrl,
+    this.audioUrl,
+    required this.isRead,
     required this.createdAt,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
-    // 1. Extraemos el texto de la fecha que manda Supabase
     String dateStr = json['created_at'];
-
-    // 2. Si no trae indicador de zona horaria ('Z' o '+'), le agregamos 'Z' (Zulú/UTC)
-    // Esto obliga a Flutter a entender que la hora viene de Londres.
     if (!dateStr.endsWith('Z') && !dateStr.contains('+') && !dateStr.contains('-')) {
       dateStr += 'Z';
     }
@@ -28,7 +30,9 @@ class ChatMessage {
       offerId: json['offer_id'],
       senderId: json['sender_id'],
       message: json['message'],
-      // 3. Parseamos como UTC y lo convertimos INMEDIATAMENTE a la hora local de tu país
+      imageUrl: json['image_url'],
+      audioUrl: json['audio_url'],
+      isRead: json['is_read'] ?? false,
       createdAt: DateTime.parse(dateStr).toLocal(),
     );
   }

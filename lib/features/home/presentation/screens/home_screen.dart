@@ -10,6 +10,9 @@ import '../widgets/create_trade_modal.dart';
 import '../widgets/make_offer_modal.dart';
 import '../../../../core/services/notification_service.dart';
 
+// 👇 1. IMPORTANTE: Importamos tu pantalla de trades para acceder a sus proveedores
+import '../../../trades/presentation/screens/trades_screen.dart';
+
 class HomeScreen extends HookConsumerWidget {
   const HomeScreen({super.key});
 
@@ -19,12 +22,18 @@ class HomeScreen extends HookConsumerWidget {
     useEffect(() {
       NotificationService().initNotifications();
 
-      NotificationService().setupInteractedMessage((tradeId) {
-        debugPrint("¡Redirigiendo a la oferta con ID: $tradeId!");
+      NotificationService().setupInteractedMessage((routePath) {
+        debugPrint("¡Ejecutando Deep Link hacia: $routePath!");
 
-        // 🔥 EL GATILLO DESCOMENTADO 🔥
-        // GoRouter tomará el control y te llevará a la pantalla de la oferta
-        context.push('/offer/$tradeId');
+        // 🔥 2. EL BLINDAJE: Limpiamos la caché justo en el milisegundo que toca la notificación
+        if (routePath == '/trades') {
+          // Si va a ver sus intercambios, forzamos a descargar los datos frescos
+          ref.invalidate(receivedOffersProvider);
+          ref.invalidate(sentOffersProvider);
+        }
+
+        // 🔥 3. Usamos .go() en lugar de .push() para que el BottomNavBar reaccione correctamente
+        context.go(routePath);
       });
 
       return null;

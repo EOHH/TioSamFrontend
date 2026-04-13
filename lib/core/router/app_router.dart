@@ -16,7 +16,7 @@ import '../../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/shop/presentation/screens/shop_screen.dart';
 import '../../features/trades/presentation/screens/trades_screen.dart';
-import '../../features/chat/presentation/screens/chat_screen.dart'; // IMPORTANTE
+import '../../features/chat/presentation/screens/chat_screen.dart';
 import '../widgets/main_layout.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -43,7 +43,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
 
-      // RUTA DEL CHAT (Fuera del BottomNav porque ocupa pantalla completa)
+      // 👇 RUTA DEL CHAT ACTUALIZADA
       GoRoute(
         path: '/chat/:offerId',
         builder: (context, state) {
@@ -51,18 +51,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           // Extraemos los datos de la URL (query parameters)
           final contactName = state.uri.queryParameters['name'] ?? 'Coleccionista';
           final contactAvatar = state.uri.queryParameters['avatar'] ?? 'https://ui-avatars.com/api/?name=C';
+          // 👇 NUEVO: Extraemos el ID del contacto
+          final contactId = state.uri.queryParameters['contactId'] ?? '';
 
           return ChatScreen(
             offerId: offerId,
             contactName: contactName,
             contactAvatar: contactAvatar,
+            contactId: contactId, // 👇 Se lo pasamos a la pantalla
           );
         },
       ),
       GoRoute(
         path: '/collection-detail',
         builder: (context, state) {
-          // Extraemos el objeto completo que le pasaremos desde la cuadrícula
           final item = state.extra as CollectionItem;
           return CollectionDetailScreen(item: item);
         },
@@ -77,7 +79,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/offer/:id',
         builder: (context, state) {
-          // Extraemos el ID que viene oculto en la URL
           final tradeId = state.pathParameters['id']!;
           return OfferDetailsScreen(tradeId: tradeId);
         },

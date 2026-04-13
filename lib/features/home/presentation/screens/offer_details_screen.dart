@@ -4,10 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
-// Importamos el controlador del Home para poder refrescarlo
+// Importamos el controlador del Home (ruta relativa dentro del mismo feature)
 import '../controllers/home_feed_controller.dart';
-// 👇 IMPORTANTE: Ajusta esta ruta hacia donde guardaste el archivo que me mandaste hace un momento
-// import 'trades_screen.dart';
+// Importamos la pantalla de Trades para acceder a sus providers (cruzando features)
+import '../../../trades/presentation/screens/trades_screen.dart';
 
 // 1. EL PROVEEDOR DE DATOS
 final offerDetailsProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, tradeId) async {
@@ -74,13 +74,13 @@ class OfferDetailsScreen extends ConsumerWidget {
           ),
         );
 
-        // 🔥 Refrescamos el Feed Principal (para que la carta ya no salga)
+        // 🔥 Refrescamos el Feed Principal
         ref.invalidate(homeFeedProvider);
 
-        // 🔥 Refrescamos la lista de intercambios (descomenta esto cuando arregles el import de arriba)
-        // ref.invalidate(receivedOffersProvider);
+        // 🔥 Refrescamos la lista de intercambios recibidos
+        ref.invalidate(receivedOffersProvider);
 
-        // 🔥 REDIRECCIÓN CORRECTA A LA PANTALLA DE TRADES
+        // 🔥 REDIRECCIÓN a tu StatefulShellRoute de intercambios
         context.go('/trades');
       }
 
@@ -117,8 +117,8 @@ class OfferDetailsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Text(error, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 24),
-            // Si hay un error, los regresamos seguros al Home
-            ElevatedButton(onPressed: () => context.go('/'), child: const Text('Volver al inicio'))
+            // Regresamos seguros al Home definido en tu app_router.dart
+            ElevatedButton(onPressed: () => context.go('/home'), child: const Text('Volver al inicio'))
           ],
         ),
       ),

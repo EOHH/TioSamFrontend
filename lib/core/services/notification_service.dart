@@ -32,8 +32,8 @@ class NotificationService {
     }
   }
 
-  // 👇 ¡NUEVO! Escuchamos los toques en las notificaciones
-  void setupInteractedMessage(Function(String tradeId) onNavigate) async {
+  // 👇 AHORA RECIBE UNA RUTA COMPLETA EN LUGAR DE SOLO EL ID
+  void setupInteractedMessage(Function(String routePath) onNavigate) async {
     // 1. Si la app estaba CERRADA por completo y se abrió desde la notificación
     RemoteMessage? initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {
@@ -46,16 +46,36 @@ class NotificationService {
     });
   }
 
-  // Lógica interna para leer el "mapa secreto"
-  void _handleMessage(RemoteMessage message, Function(String tradeId) onNavigate) {
+  // 👇 LÓGICA DE ENRUTAMIENTO DINÁMICO
+  void _handleMessage(RemoteMessage message, Function(String routePath) onNavigate) {
     if (kDebugMode) print('Notificación tocada. Datos ocultos: ${message.data}');
 
-    // Verificamos si es una notificación de nueva oferta
-    if (message.data['type'] == 'new_offer') {
+    final type = message.data['type'];
+
+    // 1. Nueva Oferta -> Vamos a los detalles de la oferta
+    if (type == 'new_offer') {
       final tradeId = message.data['trade_id'];
       if (tradeId != null) {
-        // Ejecutamos la navegación hacia la pantalla de esa oferta
-        onNavigate(tradeId);
+        onNavigate('/offer/$tradeId');
+      }
+    }
+    // 2. Oferta Aceptada -> Vamos a la pantalla de intercambios
+    else if (type == 'offer_accepted') {
+      onNavigate('/trades');
+    }
+    // 3. NUEVO: Mensaje de Chat -> Vamos directo a ese chat
+    // Navegación directa al Chat con datos reales
+    else if (type == 'new_chat_message') {
+      final offerId = message.data['offer_id'];
+
+      // Extraemos la información real que mandó la Edge Function
+      final contactId = message.data['contact_id'] ?? '';
+      final contactName = message.data['contact_name'] ?? 'Coleccionista';
+      final contactAvatar = message.data['contact_avatar'] ?? 'https://ui-avatars.com/api/?name=C';
+
+      if (offerId != null) {
+        // Formateamos la URL dinámicamente con los datos reales
+        onNavigate('/chat/$offerId?name=${Uri.encodeComponent(contactName)}&avatar=${Uri.encodeComponent(contactAvatar)}&contactId=$contactId');
       }
     }
   }

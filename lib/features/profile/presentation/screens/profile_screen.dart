@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart'; // ¡Para navegar a la edición!
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -16,7 +16,6 @@ class ProfileScreen extends ConsumerWidget {
     final profileState = ref.watch(currentProfileProvider);
     final authState = ref.watch(authControllerProvider);
 
-    // Obtenemos la colección para saber exactamente cuántas cartas reales tiene
     final collectionState = ref.watch(myCollectionProvider);
     final cardsCount = collectionState.value?.length ?? 0;
 
@@ -40,7 +39,6 @@ class ProfileScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(24.0),
             child: Column(
               children: [
-                // Avatar grande optimizado
                 Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -65,9 +63,7 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // NUEVO BOTÓN: EDITAR PERFIL
                 OutlinedButton.icon(
-                  // Navegamos y le pasamos el usuario actual para que el modal sepa quién es
                   onPressed: () => context.push('/edit-profile', extra: user),
                   icon: const Icon(LucideIcons.pencil, size: 16),
                   label: const Text('Editar Perfil'),
@@ -77,15 +73,16 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 32),
 
-                // ESTADÍSTICAS 100% REALES NO FAKE
+                // 👇 ESTADÍSTICAS MEJORADAS CON ICONOS
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildStatCol(context, user.completedTrades.toString(), "Intercambios"),
-                    Container(height: 40, width: 1, color: Colors.white24),
-                    _buildStatCol(context, cardsCount.toString(), "Cartas"),
-                    Container(height: 40, width: 1, color: Colors.white24),
-                    _buildStatCol(context, user.reputation.toStringAsFixed(1), "Reputación"),
+                    _buildStatCol(context, user.completedTrades.toString(), "Tratos", icon: Icons.handshake, iconColor: Colors.blueAccent),
+                    Container(height: 40, width: 1, color: Colors.grey.withOpacity(0.3)),
+                    _buildStatCol(context, cardsCount.toString(), "Cartas", icon: LucideIcons.layers, iconColor: Colors.purpleAccent),
+                    Container(height: 40, width: 1, color: Colors.grey.withOpacity(0.3)),
+                    // 👇 Aquí mostramos la estrella de Reputación
+                    _buildStatCol(context, user.reputation.toStringAsFixed(1), "Reputación", icon: Icons.star_rounded, iconColor: Colors.amber),
                   ],
                 ),
                 const SizedBox(height: 40),
@@ -120,10 +117,21 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatCol(BuildContext context, String value, String label) {
+  // 👇 FUNCIÓN ACTUALIZADA PARA SOPORTAR ICONOS Y COLORES
+  Widget _buildStatCol(BuildContext context, String value, String label, {IconData? icon, Color? iconColor}) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 20, color: iconColor),
+              const SizedBox(width: 4),
+            ],
+            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 4),
         Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
       ],
     );
