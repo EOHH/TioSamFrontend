@@ -52,14 +52,66 @@ class OfferRepository {
         .map((event) => event.isNotEmpty ? event.first : {});
   }
 
-  // 👇 RESTAURAMOS TU RPC (Ahora funcionará con poderes absolutos)
-  Future<void> completeTrade(String offerId) async {
+  // ==========================================
+  // 🔥 LA MÁQUINA DE ESTADOS (STATE MACHINE) 🔥
+  // ==========================================
+
+  // 1. ACEPTAR OFERTA (El Efecto Dominó)
+  Future<void> acceptOffer(String offerId) async {
     try {
-      await _client.rpc('complete_trade', params: {'offer_id_param': offerId});
+      // a. Obtenemos de qué publicación es esta oferta
+      final offerData = await _client.from('trade_offers').select('post_id').eq('id', offerId).single();
+      final postId = offerData['post_id'];
+
+      // b. Aceptamos esta oferta en específico
+      await _client.from('trade_offers').update({'status': 'accepted'}).eq('id', offerId);
+
+      // c. Rechazamos automáticamente todas las demás ofertas PENDIENTES de esta misma carta
+      await _client.from('trade_offers').update({'status': 'rejected'})
+          .eq('post_id', postId)
+          .eq('status', 'pending') // Solo rechazamos las pendientes
+          .neq('id', offerId);
+
+      // d. Cerramos la publicación en el Mercado para que ya nadie más la vea
+      await _client.from('trades').update({'status': 'closed'}).eq('id', postId);
     } catch (e) {
-      throw Exception('Error al cerrar el trato en el servidor: $e');
+      throw Exception('Error al aceptar la oferta: $e');
     }
   }
+
+  // 2. CANCELAR TRATO (El plan falló, la carta vuelve al mercado)
+  Future<void> cancelTrade(String offerId) async {
+    try {
+      final offerData = await _client.from('trade_offers').select('post_id').eq('id', offerId).single();
+      final postId = offerData['post_id'];
+
+      // a. Cancelamos la oferta (o la rechazamos)
+      await _client.from('trade_offers').update({'status': 'cancelled'}).eq('id', offerId);
+
+      // b. ¡La carta vuelve a estar disponible en el Mercado!
+      await _client.from('trades').update({'status': 'open'}).eq('id', postId);
+    } catch (e) {
+      throw Exception('Error al cancelar el trato: $e');
+    }
+  }
+
+  // 3. COMPLETAR TRATO (Éxito Total) - Reemplaza a tu antiguo RPC
+  Future<void> completeTrade(String offerId) async {
+    try {
+      final offerData = await _client.from('trade_offers').select('post_id').eq('id', offerId).single();
+      final postId = offerData['post_id'];
+
+      // a. Marcamos la oferta como completada
+      await _client.from('trade_offers').update({'status': 'completed'}).eq('id', offerId);
+
+      // b. Nos aseguramos de que la carta se quede cerrada para siempre
+      await _client.from('trades').update({'status': 'closed'}).eq('id', postId);
+    } catch (e) {
+      throw Exception('Error al completar el trato: $e');
+    }
+  }
+
+  // ==========================================
 
   Future<void> updateOfferStatus(String offerId, String newStatus) async {
     await _client
@@ -68,7 +120,6 @@ class OfferRepository {
         .eq('id', offerId);
   }
 
-  // NUEVA FUNCIÓN: Eliminar una oferta de la base de datos
   Future<void> deleteOffer(String offerId) async {
     try {
       await _client.from('trade_offers').delete().eq('id', offerId);
@@ -77,17 +128,15 @@ class OfferRepository {
     }
   }
 
-  // NUEVA FUNCIÓN: Enviar una calificación y reseña
   Future<void> submitReview({
-    required String offerId, // Usamos el offerId para buscar el trade original
-    required String revieweeId, // A quién estamos calificando
+    required String offerId,
+    required String revieweeId,
     required int rating,
     required String comment,
   }) async {
     try {
       final reviewerId = _client.auth.currentUser!.id;
 
-      // 1. Primero averiguamos el trade_id a partir de la oferta
       final offerData = await _client
           .from('trade_offers')
           .select('post_id')
@@ -96,7 +145,6 @@ class OfferRepository {
 
       final tradeId = offerData['post_id'];
 
-      // 2. Insertamos la reseña en la nueva tabla
       await _client.from('reviews').insert({
         'trade_id': tradeId,
         'reviewer_id': reviewerId,

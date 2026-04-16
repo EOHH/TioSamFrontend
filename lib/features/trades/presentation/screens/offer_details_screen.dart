@@ -4,9 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 
-// Importamos el controlador del Home (ruta relativa dentro del mismo feature)
+// 👇 1. IMPORTAMOS TU REPOSITORIO (El Cerebro)
+import '../../data/offer_repository.dart';
+
+// Importamos el controlador del Home y Mercado para refrescarlos
 import '../../../profile/presentation/controllers/my_posts_controller.dart';
-// Importamos la pantalla de Trades para acceder a sus providers (cruzando features)
+import '../../../market/data/market_repository.dart';
 import 'trades_screen.dart';
 
 // 1. EL PROVEEDOR DE DATOS
@@ -36,58 +39,53 @@ class OfferDetailsScreen extends ConsumerWidget {
 
   const OfferDetailsScreen({super.key, required this.tradeId});
 
-  // 👇 LA LÓGICA DE NEGOCIO CERRANDO EL CICLO
+  // 👇 LA LÓGICA DE NEGOCIO DELEGADA AL REPOSITORIO
   Future<void> _responderOferta(BuildContext context, WidgetRef ref, String offerId, String status) async {
     try {
       // 1. Modal de carga
       showDialog(
-        context: context, barrierDismissible: false,
+        context: context,
+        barrierDismissible: false,
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
-      final supabase = Supabase.instance.client;
+      final offerRepo = ref.read(offerRepositoryProvider);
 
-      // 2. Actualizamos el estado de la oferta seleccionada
-      await supabase.from('trade_offers').update({'status': status}).eq('id', offerId);
-
-      // 3. Lógica de negocio si el trato es ACEPTADO
+      // 2. Lógica de negocio (La Máquina de Estados)
       if (status == 'accepted') {
-        // Marcamos la publicación original como completada
-        await supabase.from('trades').update({'status': 'completed'}).eq('id', tradeId);
-
-        // Rechazamos automáticamente a los demás postulantes para esa carta
-        await supabase.from('trade_offers')
-            .update({'status': 'rejected'})
-            .eq('post_id', tradeId)
-            .neq('id', offerId);
+        // 🔥 Llamamos al Efecto Dominó: Acepta esta, rechaza el resto y cierra la carta
+        await offerRepo.acceptOffer(offerId);
+      } else {
+        // Solo actualizamos el estado (ej. 'rejected')
+        await offerRepo.updateOfferStatus(offerId, status);
       }
 
-      // 4. Quitamos el loading
+      // 3. Quitamos el loading
       if (context.mounted) Navigator.pop(context);
 
-      // 5. Refrescamos caché y Redirigimos
+      // 4. Refrescamos caché y Redirigimos
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(status == 'accepted' ? '¡Trato cerrado con éxito! 🎉' : 'Oferta rechazada.'),
+            content: Text(status == 'accepted' ? '¡Trato aceptado! Ve al chat para coordinar 🎉' : 'Oferta rechazada.'),
             backgroundColor: status == 'accepted' ? Colors.green : Colors.red,
           ),
         );
 
-        // 🔥 Refrescamos el Feed Principal
-        ref.invalidate(homeFeedProvider);
+        // 🔥 Refrescamos la lista de tus publicaciones (para que la carta salga cerrada)
+        // Nota: Asegúrate de usar el nombre exacto de tus providers de Riverpod aquí
+        try { ref.invalidate(marketFeedProvider); } catch (_) {}
 
-        // 🔥 Refrescamos la lista de intercambios recibidos
-        ref.invalidate(receivedOffersProvider);
-
-        // 🔥 REDIRECCIÓN a tu StatefulShellRoute de intercambios
+        // 🔥 REDIRECCIÓN a tu pantalla principal de trades
         context.go('/trades');
       }
 
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context); // Quitamos loading si hay error
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red)
+        );
       }
     }
   }
@@ -115,10 +113,9 @@ class OfferDetailsScreen extends ConsumerWidget {
           children: [
             const Icon(LucideIcons.alertCircle, size: 60, color: Colors.redAccent),
             const SizedBox(height: 16),
-            Text(error, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+            Text(error.replaceAll('Exception: ', ''), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 24),
-            // Regresamos seguros al Home definido en tu app_router.dart
-            ElevatedButton(onPressed: () => context.go('/home'), child: const Text('Volver al inicio'))
+            ElevatedButton(onPressed: () => context.go('/trades'), child: const Text('Volver a Ofertas'))
           ],
         ),
       ),
@@ -142,7 +139,7 @@ class OfferDetailsScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  const Icon(LucideIcons.arrowRightLeft, size: 48, color: Colors.purpleAccent),
+                  const Icon(LucideIcons.arrowRightLeft, size: 48, color: Colors.blueAccent),
                   const SizedBox(height: 16),
                   Text('¡$ofertante quiere hacer un trato!', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                   const SizedBox(height: 24),

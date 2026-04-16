@@ -5,9 +5,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../controllers/create_offer_controller.dart';
 import '../../../../core/widgets/custom_input.dart';
+// 👇 IMPORTANTE: Importamos la pantalla de Trades para poder invalidar su caché
+import '../screens/trades_screen.dart';
 
 class MakeOfferModal extends HookConsumerWidget {
-  // Ahora pide datos universales en vez del modelo completo
   final String tradeId;
   final String ownerUsername;
   final String offerItemName;
@@ -23,13 +24,14 @@ class MakeOfferModal extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final messageController = useTextEditingController();
     final isLoading = ref.watch(createOfferControllerProvider).isLoading;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     ref.listen<AsyncValue<void>>(
       createOfferControllerProvider,
           (previous, next) {
         if (next is AsyncError) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al enviar oferta: ${next.error}'), backgroundColor: Colors.red),
+            SnackBar(content: Text('Error al enviar oferta: ${next.error}'), backgroundColor: Colors.redAccent),
           );
         }
       },
@@ -41,27 +43,77 @@ class MakeOfferModal extends HookConsumerWidget {
         top: 24, left: 24, right: 24,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)), // Bordes más redondeados
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, -5)),
+          ]
       ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Línea indicadora de arrastre (Grabber)
             Center(
                 child: Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(10))
+                    width: 48, height: 5,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10)
+                    )
                 )
             ),
             const SizedBox(height: 24),
 
-            const Text("Proponer Intercambio", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(
-              "Estás a punto de hacer una oferta a $ownerUsername por su $offerItemName.",
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+            // Título con Ícono moderno
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(LucideIcons.arrowRightLeft, color: Colors.blueAccent, size: 24),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Text("Proponer Intercambio", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Caja de contexto enriquecida
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: isDark ? Colors.grey?.withOpacity(0.5) : Colors.grey,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.withOpacity(0.1))
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(LucideIcons.info, size: 20, color: Colors.blueAccent),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 14, height: 1.4),
+                        children: [
+                          const TextSpan(text: "Estás a punto de hacerle una oferta a "),
+                          TextSpan(text: ownerUsername, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                          const TextSpan(text: " por su "),
+                          TextSpan(text: offerItemName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const TextSpan(text: "."),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -72,9 +124,10 @@ class MakeOfferModal extends HookConsumerWidget {
             ),
             const SizedBox(height: 32),
 
+            // Botón de acción Premium
             SizedBox(
-              width: double.infinity, height: 50,
-              child: ElevatedButton(
+              width: double.infinity, height: 52,
+              child: ElevatedButton.icon(
                 onPressed: isLoading ? null : () async {
                   if (messageController.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -94,15 +147,34 @@ class MakeOfferModal extends HookConsumerWidget {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text('¡Oferta enviada con éxito!'),
-                          backgroundColor: Colors.green
+                        content: Row(
+                          children: [
+                            Icon(LucideIcons.checkCircle2, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text('¡Oferta enviada con éxito!', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating, // Estilo de notificación moderno
                       ),
                     );
+
+                    // 🔥 LA MAGIA DEL CACHÉ: Le avisamos a la pestaña de "Enviados" que se actualice de inmediato
+                    ref.invalidate(sentOffersProvider);
                   }
                 },
-                child: isLoading
+                icon: isLoading
+                    ? const SizedBox.shrink()
+                    : const Icon(LucideIcons.send, color: Colors.white, size: 20),
+                label: isLoading
                     ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text("Enviar Propuesta", style: TextStyle(fontWeight: FontWeight.bold)),
+                    : const Text("Enviar Propuesta", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    elevation: 4,
+                    shadowColor: Colors.blueAccent.withOpacity(0.4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                ),
               ),
             ),
             const SizedBox(height: 32),

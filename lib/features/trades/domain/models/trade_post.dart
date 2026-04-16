@@ -7,8 +7,9 @@ class TradePost {
   final String? offerItemImage;
   final String requestItemName;
   final String? description;
+  final String category; // Nueva
+  final String status;   // Nueva
   final DateTime createdAt;
-  final String status; // 🔥 Nueva variable para controlar si está activo o cerrado
 
   TradePost({
     required this.id,
@@ -19,8 +20,9 @@ class TradePost {
     this.offerItemImage,
     required this.requestItemName,
     this.description,
+    required this.category,
+    required this.status,
     required this.createdAt,
-    this.status = 'open', // 🔥 Por defecto siempre será 'open'
   });
 
   factory TradePost.fromJson(Map<String, dynamic> json) {
@@ -35,8 +37,9 @@ class TradePost {
       offerItemImage: json['image_url'],
       requestItemName: json['request_item'],
       description: json['description'],
+      category: json['category'] ?? 'General',
+      status: json['status'] ?? 'open',
       createdAt: DateTime.parse(json['created_at']),
-      status: json['status'] ?? 'open', // 🔥 Leemos el estado desde la DB
     );
   }
 }

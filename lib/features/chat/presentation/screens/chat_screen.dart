@@ -72,9 +72,15 @@ class ChatScreen extends HookConsumerWidget {
     final onlineUsers = ref.watch(presenceProvider);
     final isOnline = onlineUsers.contains(contactId);
 
-    // 👇 FIX: Nombre de variable unificado a isCompleted
+    // 👇 ESCUCHAMOS LOS ESTADOS EN VIVO DESDE SUPABASE
     final offerData = ref.watch(offerStatusProvider(offerId)).asData?.value;
     final isCompleted = offerData?['status'] == 'completed';
+    final isCancelled = offerData?['status'] == 'cancelled' || offerData?['status'] == 'rejected';
+
+    // 🔥 LA MAGIA DE LOS PERMISOS: Solo el dueño de la publicación puede cerrar el trato
+    // Comparamos el ID del ofertante con tu ID. Si NO eres el ofertante, significa que eres el dueño.
+    final isOfferer = offerData?['offerer_id'] == myUserId;
+    final isPostOwner = !isOfferer && offerData != null;
 
     final currentMessages = chatState.asData?.value ?? [];
     useEffect(() {
@@ -229,13 +235,13 @@ class ChatScreen extends HookConsumerWidget {
               onPressed: () async {
                 Navigator.pop(dialogContext); // Cerramos el primer diálogo
                 try {
-                  // 1. Cerramos el trato en la base de datos
+                  // 🔥 LLAMAMOS A LA NUEVA FUNCIÓN QUE CIERRA EL TRATO
                   await ref.read(offerRepositoryProvider).completeTrade(offerId);
 
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Intercambio completado exitosamente! 🎉'), backgroundColor: Colors.blue));
 
-                    // 2. ¡MAGIA! Abrimos el modal para calificar al usuario
+                    // ¡MAGIA! Abrimos el modal para calificar al usuario
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true, // Para que el teclado no lo tape
@@ -260,7 +266,7 @@ class ChatScreen extends HookConsumerWidget {
                                 Text('Califica a $contactName', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 10),
 
-                                // 👇 Estrellas interactivas
+                                // Estrellas interactivas
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: List.generate(5, (index) {
@@ -344,7 +350,7 @@ class ChatScreen extends HookConsumerWidget {
         builder: (dialogContext) => AlertDialog(
           backgroundColor: Theme.of(context).colorScheme.surface,
           title: const Row(children: [Icon(LucideIcons.xCircle, color: Colors.red), SizedBox(width: 10), Text('¿Cancelar Trato?')]),
-          content: const Text('Si no llegaron a un acuerdo, puedes cancelar este trato. Se cerrará el chat para ambos de forma permanente.'),
+          content: const Text('Si no llegaron a un acuerdo, puedes cancelar este trato. Tu carta volverá al mercado para recibir otras ofertas.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Volver', style: TextStyle(color: Colors.grey))),
             ElevatedButton(
@@ -352,10 +358,12 @@ class ChatScreen extends HookConsumerWidget {
               onPressed: () async {
                 Navigator.pop(dialogContext);
                 try {
-                  await ref.read(offerRepositoryProvider).updateOfferStatus(offerId, 'rejected');
+                  // 🔥 LLAMAMOS A LA NUEVA FUNCIÓN QUE CANCELA Y LIBERA LA CARTA
+                  await ref.read(offerRepositoryProvider).cancelTrade(offerId);
+
                   if (context.mounted) {
-                    context.pop();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Intercambio cancelado.'), backgroundColor: Colors.red));
+                    context.pop(); // Sacamos al usuario de la pantalla de chat si la canceló
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Intercambio cancelado. Tu carta está de vuelta en el mercado.'), backgroundColor: Colors.red));
                   }
                 } catch (e) {
                   if (context.mounted) {
@@ -409,13 +417,15 @@ class ChatScreen extends HookConsumerWidget {
         ),
         elevation: 1,
         actions: [
-          if (!isCompleted)
+          // 👇 LOS INDICADORES DE ESTADO EN LA BARRA SUPERIOR
+          // 🔥 Solo mostramos el botón de completar SI eres el dueño del post
+          if (!isCompleted && !isCancelled && isPostOwner)
             IconButton(
               icon: const Icon(LucideIcons.checkCircle2, color: Colors.blueAccent),
               tooltip: 'Marcar como Completado',
               onPressed: _confirmCompletion,
             )
-          else
+          else if (isCompleted)
             const Padding(
               padding: EdgeInsets.only(right: 16.0),
               child: Center(
@@ -429,27 +439,42 @@ class ChatScreen extends HookConsumerWidget {
               ),
             ),
 
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.grey),
-            color: Theme.of(context).colorScheme.surface,
-            onSelected: (value) {
-              if (value == 'cancel') {
-                _cancelTrade();
-              }
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(
-                value: 'cancel',
+          if (isCancelled)
+            const Padding(
+              padding: EdgeInsets.only(right: 16.0),
+              child: Center(
                 child: Row(
                   children: [
                     Icon(LucideIcons.xCircle, color: Colors.redAccent, size: 20),
-                    SizedBox(width: 10),
-                    Text('Cancelar Trato', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                    SizedBox(width: 4),
+                    Text('Cancelado', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+
+          if (!isCompleted && !isCancelled)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.grey),
+              color: Theme.of(context).colorScheme.surface,
+              onSelected: (value) {
+                if (value == 'cancel') {
+                  _cancelTrade();
+                }
+              },
+              itemBuilder: (BuildContext context) => [
+                const PopupMenuItem(
+                  value: 'cancel',
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.xCircle, color: Colors.redAccent, size: 20),
+                      SizedBox(width: 10),
+                      Text('Cancelar Trato', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           const SizedBox(width: 4),
         ],
       ),
@@ -639,69 +664,82 @@ class ChatScreen extends HookConsumerWidget {
               child: Text('Enviando...', style: TextStyle(color: Colors.grey, fontSize: 12)),
             ),
 
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-            color: isDarkMode ? const Color(0xFF1E2428) : Colors.transparent,
-            child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? const Color(0xFF2A2F32) : Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(LucideIcons.smile, color: isDarkMode ? Colors.grey : Colors.black45),
-                            onPressed: () {},
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: messageController,
-                              textCapitalization: TextCapitalization.sentences,
-                              minLines: 1, maxLines: 5,
-                              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                              decoration: InputDecoration(
-                                hintText: "Mensaje",
-                                border: InputBorder.none,
-                                hintStyle: TextStyle(color: isDarkMode ? Colors.white60 : Colors.grey),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          // 👇 OCULTAMOS EL INPUT SI EL TRATO YA SE CERRÓ O CANCELÓ
+          if (isCompleted || isCancelled)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              color: isDarkMode ? const Color(0xFF1E2428) : Colors.white,
+              child: Text(
+                isCompleted ? 'Este intercambio ha sido completado. 🎉' : 'Este trato fue cancelado.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+              color: isDarkMode ? const Color(0xFF1E2428) : Colors.transparent,
+              child: SafeArea(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? const Color(0xFF2A2F32) : Colors.white,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(LucideIcons.smile, color: isDarkMode ? Colors.grey : Colors.black45),
+                              onPressed: () {},
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: messageController,
+                                textCapitalization: TextCapitalization.sentences,
+                                minLines: 1, maxLines: 5,
+                                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                                decoration: InputDecoration(
+                                  hintText: "Mensaje",
+                                  border: InputBorder.none,
+                                  hintStyle: TextStyle(color: isDarkMode ? Colors.white60 : Colors.grey),
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
                               ),
                             ),
-                          ),
-                          IconButton(
-                            icon: Icon(LucideIcons.paperclip, color: isDarkMode ? Colors.grey : Colors.black45),
-                            onPressed: isUploading.value || isRecording.value ? null : _showAttachmentOptions,
-                          ),
-                          if (!hasText.value)
                             IconButton(
-                              icon: Icon(LucideIcons.camera, color: isDarkMode ? Colors.grey : Colors.black45),
-                              onPressed: () => sendImageMessage(ImageSource.camera),
+                              icon: Icon(LucideIcons.paperclip, color: isDarkMode ? Colors.grey : Colors.black45),
+                              onPressed: isUploading.value || isRecording.value ? null : _showAttachmentOptions,
                             ),
-                        ],
+                            if (!hasText.value)
+                              IconButton(
+                                icon: Icon(LucideIcons.camera, color: isDarkMode ? Colors.grey : Colors.black45),
+                                onPressed: () => sendImageMessage(ImageSource.camera),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 5),
-                  GestureDetector(
-                    onTap: hasText.value ? sendTextMessage : null,
-                    onLongPressStart: hasText.value ? null : (_) => startRecording(),
-                    onLongPressEnd: hasText.value ? null : (_) => stopRecordingAndSend(),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isRecording.value ? Colors.red : const Color(0xFF00897B),
-                        shape: BoxShape.circle,
+                    const SizedBox(width: 5),
+                    GestureDetector(
+                      onTap: hasText.value ? sendTextMessage : null,
+                      onLongPressStart: hasText.value ? null : (_) => startRecording(),
+                      onLongPressEnd: hasText.value ? null : (_) => stopRecordingAndSend(),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isRecording.value ? Colors.red : const Color(0xFF00897B),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(hasText.value ? LucideIcons.send : LucideIcons.mic, color: Colors.white, size: 22),
                       ),
-                      child: Icon(hasText.value ? LucideIcons.send : LucideIcons.mic, color: Colors.white, size: 22),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

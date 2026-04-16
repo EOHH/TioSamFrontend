@@ -12,6 +12,7 @@ final categoriesProvider = FutureProvider<List<String>>((ref) async {
 });
 
 final marketFeedProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  ref.keepAlive();
   final repository = ref.watch(marketRepositoryProvider);
   return await repository.getRecentTrades();
 });

@@ -19,6 +19,7 @@ class CreateOfferController extends StateNotifier<AsyncValue<void>> {
   }
 }
 
-final createOfferControllerProvider = StateNotifierProvider<CreateOfferController, AsyncValue<void>>((ref) {
+// Añadimos autoDispose para liberar memoria al cerrar el modal
+final createOfferControllerProvider = StateNotifierProvider.autoDispose<CreateOfferController, AsyncValue<void>>((ref) {
   return CreateOfferController(ref.watch(offerRepositoryProvider));
 });

@@ -99,8 +99,9 @@ class MarketScreen extends HookConsumerWidget {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                ref.refresh(marketFeedProvider);
-                ref.refresh(categoriesProvider);
+                // Forzamos la recarga desde internet ignorando el caché temporal
+                ref.invalidate(marketFeedProvider);
+                ref.invalidate(categoriesProvider);
               },
               child: marketState.when(
                 data: (trades) {
@@ -147,17 +148,25 @@ class MarketScreen extends HookConsumerWidget {
                       final rawData = filteredTrades[index];
                       final user = rawData['users'] ?? {};
 
-                      // 🔥 CREAMOS EL OBJETO CON EL STATUS RESTAURADO
+                      // 🔥 FIX DE IMAGEN: Verificamos que no sea un string vacío o nulo "mentiroso"
+                      String? validImageUrl = rawData['image_url'];
+                      if (validImageUrl != null && validImageUrl.trim().isEmpty) {
+                        validImageUrl = null;
+                      }
+
+                      // CREAMOS EL OBJETO TRADEPOST
                       final post = TradePost(
                         id: rawData['id'],
                         userId: rawData['user_id'],
                         username: user['username'] ?? 'Usuario',
                         userAvatar: user['avatar_url'] ?? 'https://ui-avatars.com/api/?name=U',
                         offerItemName: rawData['offer_item'] ?? 'Sin nombre',
-                        offerItemImage: rawData['image_url'],
+                        offerItemImage: validImageUrl, // Usamos la URL validada
                         requestItemName: rawData['request_item'] ?? 'Cualquiera',
+                        description: rawData['description'],
+                        category: rawData['category'] ?? 'General',
                         createdAt: DateTime.parse(rawData['created_at']),
-                        status: rawData['status'] ?? 'open', // <- El status ya está aquí
+                        status: rawData['status'] ?? 'open',
                       );
 
                       final isMyTrade = myUserId == post.userId;

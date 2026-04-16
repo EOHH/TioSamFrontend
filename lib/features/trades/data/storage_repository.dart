@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart'; // Para debugPrint
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/providers/supabase_provider.dart';
@@ -19,6 +20,9 @@ class StorageRepository {
       final imageUrl = _client.storage.from('trade_images').getPublicUrl(path);
       return imageUrl;
     } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error en StorageRepository: $e');
+      }
       return null;
     }
   }
