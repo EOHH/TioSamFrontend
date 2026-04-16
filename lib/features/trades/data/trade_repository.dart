@@ -7,11 +7,12 @@ class TradeRepository {
   final SupabaseClient _client;
   TradeRepository(this._client);
 
-  // Obtener todas las publicaciones con los datos del usuario (JOIN)
+  // Obtener todas las publicaciones activas con los datos del usuario (JOIN)
   Future<List<TradePost>> getTrades() async {
     final response = await _client
         .from('trades')
         .select('*, users(username, avatar_url)')
+        .eq('status', 'open') // 🔥 FILTRO: Solo traemos publicaciones abiertas
         .order('created_at', ascending: false);
 
     return (response as List).map((json) => TradePost.fromJson(json)).toList();
@@ -23,6 +24,7 @@ class TradeRepository {
     required String request,
     String? description,
     String? imageUrl,
+    String category = 'General', // 🔥 SOPORTE PARA CATEGORÍAS (Por defecto 'General')
   }) async {
     final userId = _client.auth.currentUser!.id;
 
@@ -32,6 +34,8 @@ class TradeRepository {
       'request_item': request,
       'description': description,
       'image_url': imageUrl,
+      'category': category, // 🔥 Guardamos la categoría en Supabase
+      'status': 'open',     // 🔥 FORZAMOS a que nazca como 'open'
     });
   }
 }
