@@ -72,8 +72,9 @@ class OfferRepository {
           .eq('status', 'pending') // Solo rechazamos las pendientes
           .neq('id', offerId);
 
-      // d. Cerramos la publicación en el Mercado para que ya nadie más la vea
-      await _client.from('trades').update({'status': 'closed'}).eq('id', postId);
+      // d. 🔥 FIX: Cambiamos a 'in_progress'. Esto la oculta del Mercado (porque no es 'open'),
+      // pero avisa al Perfil que aún no está 'closed' (terminada).
+      await _client.from('trades').update({'status': 'in_progress'}).eq('id', postId);
     } catch (e) {
       throw Exception('Error al aceptar la oferta: $e');
     }
@@ -88,14 +89,14 @@ class OfferRepository {
       // a. Cancelamos la oferta (o la rechazamos)
       await _client.from('trade_offers').update({'status': 'cancelled'}).eq('id', offerId);
 
-      // b. ¡La carta vuelve a estar disponible en el Mercado!
+      // b. ¡La carta vuelve a estar disponible en el Mercado! ('open')
       await _client.from('trades').update({'status': 'open'}).eq('id', postId);
     } catch (e) {
       throw Exception('Error al cancelar el trato: $e');
     }
   }
 
-  // 3. COMPLETAR TRATO (Éxito Total) - Reemplaza a tu antiguo RPC
+  // 3. COMPLETAR TRATO (Éxito Total)
   Future<void> completeTrade(String offerId) async {
     try {
       final offerData = await _client.from('trade_offers').select('post_id').eq('id', offerId).single();
@@ -104,7 +105,7 @@ class OfferRepository {
       // a. Marcamos la oferta como completada
       await _client.from('trade_offers').update({'status': 'completed'}).eq('id', offerId);
 
-      // b. Nos aseguramos de que la carta se quede cerrada para siempre
+      // b. 🔥 FIX: Ahora sí, la carta se marca como 'closed' (Completada totalmente)
       await _client.from('trades').update({'status': 'closed'}).eq('id', postId);
     } catch (e) {
       throw Exception('Error al completar el trato: $e');

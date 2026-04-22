@@ -8,6 +8,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/widgets/trade_card.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../collection/presentation/controllers/collection_controller.dart';
+import '../../../market/data/market_repository.dart';
+import '../../../shop/presentation/controllers/shop_controller.dart';
 import '../../../trades/presentation/widgets/create_trade_modal.dart';
 import '../controllers/my_posts_controller.dart';
 import '../controllers/profile_controller.dart';
@@ -238,12 +240,12 @@ class ProfileScreen extends ConsumerWidget {
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), // Margen ajustado para el TradeCard
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                             itemCount: recentPosts.length,
                             itemBuilder: (context, index) {
                               final rawData = recentPosts[index];
-
                               final userMap = rawData['users'] ?? {};
+
                               final post = TradePost(
                                 id: rawData['id'],
                                 userId: rawData['user_id'],
@@ -256,9 +258,13 @@ class ProfileScreen extends ConsumerWidget {
                                 category: rawData['category'] ?? 'General',
                                 createdAt: DateTime.parse(rawData['created_at']),
                                 status: rawData['status'] ?? 'open',
+                                // 🔥 AHORA LE PASAMOS LOS DATOS DE MONETIZACIÓN AL MODELO
+                                isVip: userMap['is_vip'] ?? false,
+                                isBoosted: rawData['is_boosted'] ?? false,
                               );
 
-                              final isClosed = post.status == 'closed' || post.status == 'completed';
+                              final isClosed = post.status == 'closed';
+                              final isInProgress = post.status == 'in_progress';
 
                               return Stack(
                                 children: [
@@ -270,12 +276,44 @@ class ProfileScreen extends ConsumerWidget {
                                       icon: const Icon(Icons.more_vert, color: Colors.grey, size: 20),
                                       color: Theme.of(context).colorScheme.surface,
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                      onSelected: (value) {
+                                      onSelected: (value) async {
                                         if (value == 'delete') {
                                           _confirmDeletePost(context, ref, post.id);
+                                        } else if (value == 'boost') {
+                                          // 🔥 LÓGICA DE DESTACAR
+                                          if (post.isBoosted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('¡Esta carta ya está destacada! 🚀'), backgroundColor: Colors.orange)
+                                            );
+                                            return;
+                                          }
+
+                                          final success = await ref.read(shopControllerProvider.notifier).boostPost(post.id);
+                                          if (success && context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('¡Carta Destacada con éxito! (-50 Gemas)'), backgroundColor: Colors.green)
+                                            );
+                                            // Refrescamos para que aparezca el borde dorado inmediatamente
+                                            ref.refresh(myHistoryFeedProvider);
+                                            ref.refresh(marketFeedProvider);
+                                          }
                                         }
                                       },
                                       itemBuilder: (BuildContext context) => [
+                                        // Opción 1: Destacar Carta
+                                        if (!post.isBoosted) // Solo lo mostramos si no está destacada aún
+                                          const PopupMenuItem(
+                                            value: 'boost',
+                                            child: Row(
+                                              children: [
+                                                Icon(LucideIcons.rocket, color: Colors.orange, size: 20),
+                                                SizedBox(width: 10),
+                                                Text('Destacar (50 Gemas)', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                                              ],
+                                            ),
+                                          ),
+
+                                        // Opción 2: Eliminar
                                         const PopupMenuItem(
                                           value: 'delete',
                                           child: Row(
@@ -290,6 +328,7 @@ class ProfileScreen extends ConsumerWidget {
                                     ),
                                   ),
 
+                                  // 🔥 ETIQUETA 1: COMPLETADO (Verde)
                                   if (isClosed)
                                     Positioned(
                                       top: 26,
@@ -310,6 +349,28 @@ class ProfileScreen extends ConsumerWidget {
                                         ),
                                       ),
                                     ),
+
+                                  // 🔥 ETIQUETA 2: EN PROGRESO (Amarillo/Naranja)
+                                  if (isInProgress)
+                                    Positioned(
+                                      top: 26,
+                                      left: 32,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.withOpacity(0.95),
+                                          borderRadius: BorderRadius.circular(20),
+                                          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
+                                        ),
+                                        child: const Row(
+                                          children: [
+                                            Icon(LucideIcons.loader2, color: Colors.white, size: 16),
+                                            SizedBox(width: 6),
+                                            Text('En Progreso', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               );
                             },
@@ -322,7 +383,7 @@ class ProfileScreen extends ConsumerWidget {
                                 style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w500),
                               ),
                             ),
-                          const SizedBox(height: 80), // Espacio para el FAB
+                          const SizedBox(height: 80),
                         ],
                       );
                     },

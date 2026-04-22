@@ -33,12 +33,12 @@ class MarketScreen extends HookConsumerWidget {
     return Scaffold(
       backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.grey,
       appBar: AppBar(
-        title: const Text('Mercado de Intercambio', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Mercado de Intercambio', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: -0.5)),
         elevation: 0,
       ),
       body: Column(
         children: [
-          // BARRA DE BÚSQUEDA
+          // --- BARRA DE BÚSQUEDA ---
           Container(
             color: Theme.of(context).scaffoldBackgroundColor,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -58,13 +58,13 @@ class MarketScreen extends HookConsumerWidget {
                     : null,
                 filled: true,
                 fillColor: isDarkMode ? Colors.grey : Colors.grey,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
           ),
 
-          // FILTROS DE CATEGORÍA DINÁMICOS
+          // --- FILTROS DE CATEGORÍA DINÁMICOS ---
           Container(
             color: Theme.of(context).scaffoldBackgroundColor,
             height: 50,
@@ -80,9 +80,10 @@ class MarketScreen extends HookConsumerWidget {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: ChoiceChip(
-                      label: Text(category),
+                      label: Text(category, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                       selected: isSelected,
-                      selectedColor: Colors.blueAccent,
+                      selectedColor: Colors.blueAccent.withOpacity(0.2),
+                      side: BorderSide(color: isSelected ? Colors.blueAccent : Colors.transparent),
                       onSelected: (bool selected) {
                         selectedCategory.value = category;
                       },
@@ -95,7 +96,7 @@ class MarketScreen extends HookConsumerWidget {
             ),
           ),
 
-          // LISTA DE PUBLICACIONES
+          // --- LISTA DE PUBLICACIONES ---
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
@@ -126,13 +127,13 @@ class MarketScreen extends HookConsumerWidget {
                         Center(
                           child: Column(
                             children: [
-                              Icon(LucideIcons.searchX, size: 64, color: Colors.grey),
+                              const Icon(LucideIcons.searchX, size: 64, color: Colors.grey),
                               const SizedBox(height: 16),
                               Text(
                                 searchQuery.value.isEmpty
                                     ? 'No hay publicaciones activas.'
                                     : 'No encontramos resultados.',
-                                style: const TextStyle(color: Colors.grey, fontSize: 16),
+                                style: const TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w500),
                               ),
                             ],
                           ),
@@ -148,25 +149,28 @@ class MarketScreen extends HookConsumerWidget {
                       final rawData = filteredTrades[index];
                       final user = rawData['users'] ?? {};
 
-                      // 🔥 FIX DE IMAGEN: Verificamos que no sea un string vacío o nulo "mentiroso"
+                      // FIX DE IMAGEN: Verificamos que no sea un string vacío o nulo "mentiroso"
                       String? validImageUrl = rawData['image_url'];
                       if (validImageUrl != null && validImageUrl.trim().isEmpty) {
                         validImageUrl = null;
                       }
 
-                      // CREAMOS EL OBJETO TRADEPOST
+                      // 🔥 CREAMOS EL OBJETO TRADEPOST CON LOS DATOS PREMIUM
                       final post = TradePost(
                         id: rawData['id'],
                         userId: rawData['user_id'],
                         username: user['username'] ?? 'Usuario',
                         userAvatar: user['avatar_url'] ?? 'https://ui-avatars.com/api/?name=U',
                         offerItemName: rawData['offer_item'] ?? 'Sin nombre',
-                        offerItemImage: validImageUrl, // Usamos la URL validada
+                        offerItemImage: validImageUrl,
                         requestItemName: rawData['request_item'] ?? 'Cualquiera',
                         description: rawData['description'],
                         category: rawData['category'] ?? 'General',
                         createdAt: DateTime.parse(rawData['created_at']),
                         status: rawData['status'] ?? 'open',
+                        // ✨ AQUÍ ESTÁ LA MAGIA: Le pasamos la información VIP y Boost
+                        isVip: user['is_vip'] ?? false,
+                        isBoosted: rawData['is_boosted'] ?? false,
                       );
 
                       final isMyTrade = myUserId == post.userId;

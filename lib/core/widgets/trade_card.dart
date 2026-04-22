@@ -20,204 +20,242 @@ class TradeCard extends StatelessWidget {
   String _getTimeAgo(DateTime dateTime) {
     final difference = DateTime.now().difference(dateTime);
     if (difference.inDays > 8) return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-    else if ((difference.inDays / 7).floor() >= 1) return 'Hace 1 semana';
-    else if (difference.inDays >= 2) return 'Hace ${difference.inDays} días';
-    else if (difference.inDays >= 1) return 'Hace 1 día';
-    else if (difference.inHours >= 2) return 'Hace ${difference.inHours} horas';
-    else if (difference.inHours >= 1) return 'Hace 1 hora';
-    else if (difference.inMinutes >= 2) return 'Hace ${difference.inMinutes} minutos';
-    else if (difference.inMinutes >= 1) return 'Hace 1 minuto';
-    else return 'Justo ahora';
+    if (difference.inDays >= 1) return 'Hace ${difference.inDays} ${difference.inDays == 1 ? 'día' : 'días'}';
+    if (difference.inHours >= 1) return 'Hace ${difference.inHours} ${difference.inHours == 1 ? 'hora' : 'horas'}';
+    if (difference.inMinutes >= 1) return 'Hace ${difference.inMinutes} min';
+    return 'Justo ahora';
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool isBoosted = post.isBoosted;
+    final bool isVip = post.isVip;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: Theme.of(context).colorScheme.surface,
-      elevation: isDark ? 2 : 6, // Sombra más pronunciada en modo claro
-      shadowColor: Colors.black.withOpacity(isDark ? 0.5 : 0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24), // Esquinas más redondas
-        side: BorderSide(color: Colors.grey.withOpacity(0.1), width: 1),
+    // Paleta de colores Premium
+    final Color goldColor = isDark ? const Color(0xFFFFD700) : const Color(0xFFD4AF37);
+    final Color boostColor = Colors.orangeAccent;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        // ✨ Aura exterior solo para destacados (Efecto Resplandor)
+        boxShadow: [
+          if (isBoosted)
+            BoxShadow(
+              color: boostColor.withOpacity(0.3),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- CABECERA DE USUARIO ---
-            Row(
-              children: [
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            // ✨ Borde inteligente: Dorado para VIP, Naranja fuego para Boosted
+            border: Border.all(
+              color: isBoosted
+                  ? boostColor
+                  : (isVip ? goldColor.withOpacity(0.6) : Colors.grey.withOpacity(0.1)),
+              width: (isBoosted || isVip) ? 2.5 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              // 🚀 Banner de Publicación Destacada (Solo si es Boosted)
+              if (isBoosted)
                 Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.blueAccent.withOpacity(0.5), width: 2),
-                  ),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundImage: CachedNetworkImageProvider(post.userAvatar),
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(post.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: -0.3)),
-                      Text(
-                        _getTimeAgo(post.createdAt),
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                if (trailingWidget != null) trailingWidget!,
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // --- SECCIÓN DE CARTAS (EL REDISEÑO) ---
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Carta 1 (Ofrece)
-                Expanded(child: _buildModernItemBox(context, post.offerItemName, post.offerItemImage, isOffer: true)),
-
-                // Flecha central moderna
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                        color: isDark ? Colors.grey : Colors.grey,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))
-                        ]
+                    gradient: LinearGradient(
+                      colors: [boostColor, Colors.deepOrange.shade400],
                     ),
-                    child: Icon(LucideIcons.arrowRightLeft, color: isDark ? Colors.white70 : Colors.black87, size: 20),
+                  ),
+                  child: const Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.rocket, color: Colors.white, size: 14),
+                        SizedBox(width: 8),
+                        Text(
+                          'DESTACADO POR EL COLECCIONISTA',
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
-                // Carta 2 (Busca)
-                Expanded(child: _buildModernItemBox(context, post.requestItemName, null, isOffer: false)),
-              ],
-            ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // --- HEADER ---
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: isVip
+                                ? LinearGradient(colors: [goldColor, Colors.white, goldColor])
+                                : null,
+                            color: !isVip ? Colors.blueAccent.withOpacity(0.3) : null,
+                          ),
+                          child: CircleAvatar(
+                            radius: 22,
+                            backgroundImage: CachedNetworkImageProvider(post.userAvatar),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      post.username,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 17,
+                                        color: isVip ? goldColor : null,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isVip) ...[
+                                    const SizedBox(width: 6),
+                                    Icon(LucideIcons.crown, color: goldColor, size: 18),
+                                  ],
+                                ],
+                              ),
+                              Text(_getTimeAgo(post.createdAt), style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        if (trailingWidget != null) trailingWidget!,
+                      ],
+                    ),
+                    const SizedBox(height: 20),
 
-            // --- BOTÓN DE ACCIÓN ---
-            if (showOfferButton) ...[
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: onTradeTap,
-                  icon: const Icon(LucideIcons.zap, size: 20, color: Colors.white),
-                  label: const Text('Proponer Intercambio', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent, // Color vibrante
-                    elevation: 4,
-                    shadowColor: Colors.blueAccent.withOpacity(0.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
+                    // --- CARDS VIEW ---
+                    Row(
+                      children: [
+                        Expanded(child: _buildItemNode(context, post.offerItemName, post.offerItemImage, true)),
+                        _buildExchangeDivider(isDark),
+                        Expanded(child: _buildItemNode(context, post.requestItemName, null, false)),
+                      ],
+                    ),
+
+                    // --- ACTION BUTTON ---
+                    if (showOfferButton) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        width: double.infinity,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF4facfe), Color(0xFF00f2fe)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            )
+                          ],
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: onTradeTap,
+                          icon: const Icon(LucideIcons.zap, color: Colors.white),
+                          label: const Text(
+                            'PROPONER TRATO',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          ),
+                        ),
+                      ),
+                    ]
+                  ],
                 ),
               ),
-            ]
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // 🔥 EL NUEVO COMPONENTE VISUAL DE LA CARTA
-  Widget _buildModernItemBox(BuildContext context, String title, String? imageUrl, {required bool isOffer}) {
-    final color = isOffer ? Colors.cyan : Colors.purpleAccent;
+  Widget _buildItemNode(BuildContext context, String name, String? img, bool isOffer) {
+    final color = isOffer ? Colors.cyan.shade400 : Colors.purpleAccent.shade100;
 
     return Column(
       children: [
-        // Etiqueta superior (Badge)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.3)),
-          ),
-          child: Text(
-            isOffer ? 'OFRECE' : 'BUSCA',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: color),
-          ),
+        Text(
+          isOffer ? 'OFRECE' : 'BUSCA',
+          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2),
         ),
-        const SizedBox(height: 12),
-
-        // Contenedor de la imagen/texto
+        const SizedBox(height: 8),
         Container(
-          height: 160, // Altura fija para que ambas cartas midan igual
-          width: double.infinity,
+          height: 160,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(0.3), width: 1.5),
-            boxShadow: [
-              BoxShadow(color: color.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
-            ],
+            borderRadius: BorderRadius.circular(22),
+            color: Colors.grey.withOpacity(0.05),
+            border: Border.all(color: color.withOpacity(0.2), width: 1.5),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(14), // Un poco menos que el borde exterior
+            borderRadius: BorderRadius.circular(20),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // 1. La Imagen de fondo (si existe)
-                if (imageUrl != null && imageUrl.isNotEmpty)
+                if (img != null && img.isNotEmpty)
                   CachedNetworkImage(
-                    imageUrl: imageUrl,
+                    imageUrl: img,
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                    errorWidget: (context, url, error) => const Icon(LucideIcons.imageOff, color: Colors.grey),
+                    placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    errorWidget: (_, __, ___) => const Icon(LucideIcons.imageOff, color: Colors.grey),
                   )
                 else
-                // Si no hay imagen, mostramos un ícono tenue de fondo
                   Center(child: Icon(isOffer ? LucideIcons.gift : LucideIcons.search, size: 40, color: color.withOpacity(0.2))),
 
-                // 2. 🔥 LA MAGIA: El Gradiente oscuro en la parte inferior
-                if (imageUrl != null && imageUrl.isNotEmpty)
-                  Container(
+                // Overlay de texto con gradiente cinemático
+                Positioned.fill(
+                  child: Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.2),
-                          Colors.black.withOpacity(0.8),
-                          Colors.black, // Completamente negro abajo
-                        ],
-                        stops: const [0.4, 0.6, 0.8, 1.0], // Ajusta dónde empieza a oscurecerse
+                        colors: [Colors.transparent, Colors.black.withOpacity(0.05), Colors.black.withOpacity(0.8)],
                       ),
                     ),
                   ),
-
-                // 3. El Texto (Siempre blanco y encima de todo)
-                Align(
-                  alignment: imageUrl != null && imageUrl.isNotEmpty ? Alignment.bottomCenter : Alignment.center,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
                     child: Text(
-                      title,
+                      name,
                       textAlign: TextAlign.center,
-                      maxLines: 3,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        height: 1.2,
-                        // Si hay imagen, forzamos blanco por el gradiente. Si no, usamos el color del tema.
-                        color: (imageUrl != null && imageUrl.isNotEmpty) ? Colors.white : Theme.of(context).colorScheme.onSurface,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, height: 1.1),
                     ),
                   ),
                 ),
@@ -226,6 +264,20 @@ class TradeCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildExchangeDivider(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white10 : Colors.grey.shade100,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(LucideIcons.repeat, size: 18, color: isDark ? Colors.white60 : Colors.black45),
+      ),
     );
   }
 }

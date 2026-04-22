@@ -11,14 +11,15 @@ class TradeRepository {
   Future<List<TradePost>> getTrades() async {
     final response = await _client
         .from('trades')
-        .select('*, users(username, avatar_url)')
-        .eq('status', 'open') // Solo traemos lo disponible
+        .select('*, users(username, avatar_url, is_vip)')
+        .eq('status', 'open')
+        .order('is_boosted', ascending: false) // Prioridad a los Boosted
         .order('created_at', ascending: false);
 
     return (response as List).map((json) => TradePost.fromJson(json)).toList();
   }
 
-  // --- 2. CREAR PUBLICACIÓN (CON EL GUARDIÁN DE LÍMITES) ---
+  // --- 2. CREAR PUBLICACIÓN (CON INTELIGENCIA VIP) ---
   Future<void> createTrade({
     required String offer,
     required String request,
@@ -28,17 +29,19 @@ class TradeRepository {
   }) async {
     final userId = _client.auth.currentUser!.id;
 
-    // 🛡️ EL GUARDIÁN: Paso A - Obtenemos el límite del usuario
+    // 🛡️ EL GUARDIÁN: Paso A - Obtenemos datos de privilegios del usuario
     final userRes = await _client
         .from('users')
-        .select('max_active_posts')
+        .select('max_active_posts, is_vip')
         .eq('id', userId)
         .single();
 
-    final maxPosts = userRes['max_active_posts'] as int? ?? 15;
+    final bool isVip = userRes['is_vip'] ?? false;
 
-    // 🛡️ EL GUARDIÁN: Paso B - Contamos sus publicaciones activas ('open')
-    // Pedimos solo el 'id' para que la consulta sea súper ligera y rápida
+    // 🔥 Límite dinámico: Si es VIP tiene barra libre (9999), si no, lo que diga su max_active_posts o 5.
+    final maxPosts = isVip ? 9999 : (userRes['max_active_posts'] as int? ?? 5);
+
+    // 🛡️ EL GUARDIÁN: Paso B - Contamos sus publicaciones activas
     final activeTrades = await _client
         .from('trades')
         .select('id')
@@ -47,12 +50,12 @@ class TradeRepository {
 
     final currentActiveCount = List.from(activeTrades).length;
 
-    // 🛡️ EL GUARDIÁN: Paso C - Comparamos y bloqueamos si es necesario
+    // 🛡️ EL GUARDIÁN: Paso C - Bloqueo con mensaje codificado para la UI
     if (currentActiveCount >= maxPosts) {
-      throw Exception("¡Límite alcanzado! 🚫 Elimina publicaciones antiguas para crear nuevas, o expande tu vitrina en la Tienda.");
+      throw Exception("LIMIT_REACHED|Has alcanzado tu límite de $maxPosts publicaciones activas.");
     }
 
-    // ✅ Si pasó el guardián, guardamos la publicación en la base de datos
+    // ✅ Inserción limpia
     await _client.from('trades').insert({
       'user_id': userId,
       'offer_item': offer,
@@ -60,12 +63,12 @@ class TradeRepository {
       'category': category,
       'description': description,
       'image_url': imageUrl,
-      'status': 'open', // Forzamos estado inicial
+      'status': 'open',
+      'is_boosted': false,
     });
   }
 }
 
-// Proveedor del repositorio
 final tradeRepositoryProvider = Provider<TradeRepository>((ref) {
   return TradeRepository(ref.watch(supabaseClientProvider));
 });

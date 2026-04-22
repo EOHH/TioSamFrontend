@@ -4,6 +4,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../data/shop_repository.dart';
 import '../../domain/models/user_wallet.dart';
 
+// Proveedor para obtener los paquetes reales de la tienda (Google Play / Apple Store)
 final storePackagesProvider = FutureProvider.autoDispose<List<Package>>((ref) async {
   return ref.watch(shopRepositoryProvider).getRealOfferings();
 });
@@ -15,49 +16,68 @@ class ShopController extends StateNotifier<AsyncValue<UserWallet?>> {
     loadWallet();
   }
 
+  // --- 1. CARGAR SALDO ---
   Future<void> loadWallet() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repository.getMyWallet());
   }
 
-  // 🔥 COMPRA CON DINERO REAL VÍA REVENUECAT
+  // --- 2. COMPRA REAL (REVENUECAT) ---
   Future<bool> buyRealGemsPack(Package package, int gemsReward) async {
+    state = const AsyncLoading();
     try {
       final updatedWallet = await _repository.buyGemsWithRealMoney(package, gemsReward);
       state = AsyncData(updatedWallet);
       return true;
     } catch (e, st) {
       state = AsyncError(e, st);
-      loadWallet();
+      // Recargamos el wallet por si el error fue de red pero el pago sí pasó
+      await loadWallet();
       return false;
     }
   }
 
+  // --- 3. COMPRAR EXPANSIÓN (+10 ESPACIOS) ---
   Future<bool> purchaseExtraSlots() async {
+    state = const AsyncLoading();
     try {
       final updatedWallet = await _repository.buyExtraSlots();
       state = AsyncData(updatedWallet);
       return true;
     } catch (e, st) {
       state = AsyncError(e, st);
-      loadWallet();
       return false;
     }
   }
 
+  // --- 4. COMPRAR STATUS VIP (COLECCIONISTA PRO) ---
   Future<bool> purchaseVip() async {
+    state = const AsyncLoading();
     try {
       final updatedWallet = await _repository.buyVipStatus();
       state = AsyncData(updatedWallet);
       return true;
     } catch (e, st) {
       state = AsyncError(e, st);
-      loadWallet();
+      return false;
+    }
+  }
+
+  // --- 5. DESTACAR PUBLICACIÓN (BOOST) ---
+  Future<bool> boostPost(String postId) async {
+    state = const AsyncLoading();
+    try {
+      final updatedWallet = await _repository.boostPost(postId);
+      state = AsyncData(updatedWallet);
+      return true;
+    } catch (e, st) {
+      state = AsyncError(e, st);
       return false;
     }
   }
 }
 
+// Proveedor global del controlador
 final shopControllerProvider = StateNotifierProvider.autoDispose<ShopController, AsyncValue<UserWallet?>>((ref) {
   return ShopController(ref.watch(shopRepositoryProvider));
 });

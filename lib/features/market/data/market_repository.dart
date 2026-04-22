@@ -44,11 +44,13 @@ class MarketRepository {
             users ( 
               username,
               avatar_url,
-              reputation
+              reputation,
+              is_vip 
             )
-          ''')
-          .eq('status', 'open') // 🔥 FILTRO: Solo traemos los tratos que siguen abiertos
-          .order('created_at', ascending: false)
+          ''') // 🔥 AHORA PEDIMOS EL is_vip A LA BASE DE DATOS
+          .eq('status', 'open')
+          .order('is_boosted', ascending: false) // 🚀 REGLA 1: Destacados van PRIMERO
+          .order('created_at', ascending: false) // 📅 REGLA 2: Luego por fecha normal
           .limit(30);
 
       return List<Map<String, dynamic>>.from(response);

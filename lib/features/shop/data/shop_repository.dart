@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:purchases_flutter/purchases_flutter.dart'; // 👇 El gigante RevenueCat
+import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter/services.dart';
 import '../domain/models/user_wallet.dart';
 
@@ -37,12 +37,7 @@ class ShopRepository {
   // --- 3. PROCESAR PAGO REAL DE GEMAS ---
   Future<UserWallet> buyGemsWithRealMoney(Package package, int gemsReward) async {
     try {
-      // 🚀 ESTO ABRE LA PANTALLA NATIVA DE GOOGLE PLAY / APPLE PAY
       final customerInfo = await Purchases.purchasePackage(package);
-
-      // Si llegamos a esta línea, la tarjeta de crédito pasó con éxito y RevenueCat lo validó.
-      // Ahora sí, le sumamos las gemas en nuestra base de datos.
-
       final userId = _supabase.auth.currentUser!.id;
       final currentWallet = await getMyWallet();
       final newBalance = (currentWallet?.gems ?? 0) + gemsReward;
@@ -62,27 +57,59 @@ class ShopRepository {
 
   // --- 4. COMPRAR EXPANSIÓN (Gasto Interno de Gemas) ---
   Future<UserWallet> buyExtraSlots() async {
-    // ... (El mismo código que ya teníamos, esto no cambia)
     final userId = _supabase.auth.currentUser!.id;
     const cost = 100;
     final currentWallet = await getMyWallet();
     if ((currentWallet?.gems ?? 0) < cost) throw Exception("💎 No tienes suficientes Gemas.");
+
     final response = await _supabase.from('user_wallets').update({'gems': currentWallet!.gems - cost}).eq('user_id', userId).select().single();
     final userRes = await _supabase.from('users').select('max_active_posts').eq('id', userId).single();
-    final currentMax = userRes['max_active_posts'] as int? ?? 15;
+
+    // 🔥 CAMBIO: Fallback a 5 para usuarios nuevos
+    final currentMax = userRes['max_active_posts'] as int? ?? 5;
+
     await _supabase.from('users').update({'max_active_posts': currentMax + 10}).eq('id', userId);
     return UserWallet.fromJson(response);
   }
 
   // --- 5. COMPRAR VIP (Gasto Interno de Gemas) ---
   Future<UserWallet> buyVipStatus() async {
-    // ... (El mismo código que ya teníamos, esto no cambia)
     final userId = _supabase.auth.currentUser!.id;
     const cost = 300;
     final currentWallet = await getMyWallet();
     if ((currentWallet?.gems ?? 0) < cost) throw Exception("💎 No tienes suficientes Gemas.");
+
     final response = await _supabase.from('user_wallets').update({'gems': currentWallet!.gems - cost}).eq('user_id', userId).select().single();
     await _supabase.from('users').update({'is_vip': true, 'max_active_posts': 9999}).eq('id', userId);
+    return UserWallet.fromJson(response);
+  }
+
+  // --- 6. DESTACAR PUBLICACIÓN (Gasto Interno de Gemas) ---
+  Future<UserWallet> boostPost(String postId) async {
+    final userId = _supabase.auth.currentUser!.id;
+    const cost = 50;
+
+    // 1. Verificamos si tiene saldo suficiente
+    final currentWallet = await getMyWallet();
+    if ((currentWallet?.gems ?? 0) < cost) {
+      // Usamos nuestro formato de error secreto para que la UI lo detecte si quieres
+      throw Exception("💎 No tienes suficientes Gemas para destacar esta carta.");
+    }
+
+    // 2. Cobramos las 50 gemas
+    final response = await _supabase
+        .from('user_wallets')
+        .update({'gems': currentWallet!.gems - cost})
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+    // 3. Encendemos el propulsor (is_boosted = true) en la carta elegida
+    await _supabase
+        .from('trades')
+        .update({'is_boosted': true})
+        .eq('id', postId);
+
     return UserWallet.fromJson(response);
   }
 }
