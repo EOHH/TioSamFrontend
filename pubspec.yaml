@@ -50,6 +50,7 @@ dependencies:
   audioplayers: ^6.6.0
   audio_waveforms: ^2.0.2
   image_cropper: ^12.2.0
+  purchases_flutter: ^10.0.1
 
 dev_dependencies:
   flutter_test:

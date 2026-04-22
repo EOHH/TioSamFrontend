@@ -1,56 +1,88 @@
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import '../../../core/providers/supabase_provider.dart';
-import '../domain/models/shop_item.dart';
-
-class ShopRepository {
-  final SupabaseClient _client;
-  ShopRepository(this._client);
-
-  Future<List<ShopItem>> getGlobalFeed() async {
-    final currentUserId = _client.auth.currentUser!.id;
-    final response = await _client
-        .from('trades')
-        .select('*, users!inner(username, avatar_url)')
-        .neq('user_id', currentUserId)
-        .order('created_at', ascending: false);
-    return (response as List).map((json) => ShopItem.fromJson(json)).toList();
-  }
-
-  // NUEVO: Función para insertar la oferta en la base de datos
-  Future<void> sendOffer(String postId, String message) async {
-    final userId = _client.auth.currentUser!.id;
-    await _client.from('trade_offers').insert({
-      'post_id': postId,
-      'offerer_id': userId,
-      'message': message,
-      // status es 'pending' por defecto en tu BD
-    });
-  }
-}
+import 'package:purchases_flutter/purchases_flutter.dart'; // 👇 El gigante RevenueCat
+import 'package:flutter/services.dart';
+import '../domain/models/user_wallet.dart';
 
 final shopRepositoryProvider = Provider<ShopRepository>((ref) {
-  return ShopRepository(ref.watch(supabaseClientProvider));
+  return ShopRepository(Supabase.instance.client);
 });
 
-final shopFeedProvider = FutureProvider.autoDispose<List<ShopItem>>((ref) async {
-  return ref.watch(shopRepositoryProvider).getGlobalFeed();
-});
+class ShopRepository {
+  final SupabaseClient _supabase;
+  ShopRepository(this._supabase);
 
-// NUEVO: Controlador para el botón de "Enviar Oferta" (maneja el estado de carga)
-class MakeOfferController extends StateNotifier<AsyncValue<void>> {
-  final ShopRepository _repository;
-  MakeOfferController(this._repository) : super(const AsyncData(null));
+  // --- 1. OBTENER SALDO INTERNO ---
+  Future<UserWallet?> getMyWallet() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return null;
+    final response = await _supabase.from('user_wallets').select().eq('user_id', userId).maybeSingle();
+    if (response == null) return null;
+    return UserWallet.fromJson(response);
+  }
 
-  Future<bool> makeOffer(String postId, String message) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(() => _repository.sendOffer(postId, message));
-    state = result;
-    return !result.hasError;
+  // --- 2. OBTENER PAQUETES DE TIENDA REALES (Google/Apple) ---
+  Future<List<Package>> getRealOfferings() async {
+    try {
+      final offerings = await Purchases.getOfferings();
+      if (offerings.current != null && offerings.current!.availablePackages.isNotEmpty) {
+        return offerings.current!.availablePackages;
+      }
+      return [];
+    } on PlatformException catch (e) {
+      throw Exception("Error conectando con la tienda: ${e.message}");
+    }
+  }
+
+  // --- 3. PROCESAR PAGO REAL DE GEMAS ---
+  Future<UserWallet> buyGemsWithRealMoney(Package package, int gemsReward) async {
+    try {
+      // 🚀 ESTO ABRE LA PANTALLA NATIVA DE GOOGLE PLAY / APPLE PAY
+      final customerInfo = await Purchases.purchasePackage(package);
+
+      // Si llegamos a esta línea, la tarjeta de crédito pasó con éxito y RevenueCat lo validó.
+      // Ahora sí, le sumamos las gemas en nuestra base de datos.
+
+      final userId = _supabase.auth.currentUser!.id;
+      final currentWallet = await getMyWallet();
+      final newBalance = (currentWallet?.gems ?? 0) + gemsReward;
+
+      final response = await _supabase.from('user_wallets').update({'gems': newBalance}).eq('user_id', userId).select().single();
+      return UserWallet.fromJson(response);
+
+    } on PlatformException catch (e) {
+      var errorCode = PurchasesErrorHelper.getErrorCode(e);
+      if (errorCode != PurchasesErrorCode.purchaseCancelledError) {
+        throw Exception("Error en el pago: ${e.message}");
+      } else {
+        throw Exception("Pago cancelado por el usuario.");
+      }
+    }
+  }
+
+  // --- 4. COMPRAR EXPANSIÓN (Gasto Interno de Gemas) ---
+  Future<UserWallet> buyExtraSlots() async {
+    // ... (El mismo código que ya teníamos, esto no cambia)
+    final userId = _supabase.auth.currentUser!.id;
+    const cost = 100;
+    final currentWallet = await getMyWallet();
+    if ((currentWallet?.gems ?? 0) < cost) throw Exception("💎 No tienes suficientes Gemas.");
+    final response = await _supabase.from('user_wallets').update({'gems': currentWallet!.gems - cost}).eq('user_id', userId).select().single();
+    final userRes = await _supabase.from('users').select('max_active_posts').eq('id', userId).single();
+    final currentMax = userRes['max_active_posts'] as int? ?? 15;
+    await _supabase.from('users').update({'max_active_posts': currentMax + 10}).eq('id', userId);
+    return UserWallet.fromJson(response);
+  }
+
+  // --- 5. COMPRAR VIP (Gasto Interno de Gemas) ---
+  Future<UserWallet> buyVipStatus() async {
+    // ... (El mismo código que ya teníamos, esto no cambia)
+    final userId = _supabase.auth.currentUser!.id;
+    const cost = 300;
+    final currentWallet = await getMyWallet();
+    if ((currentWallet?.gems ?? 0) < cost) throw Exception("💎 No tienes suficientes Gemas.");
+    final response = await _supabase.from('user_wallets').update({'gems': currentWallet!.gems - cost}).eq('user_id', userId).select().single();
+    await _supabase.from('users').update({'is_vip': true, 'max_active_posts': 9999}).eq('id', userId);
+    return UserWallet.fromJson(response);
   }
 }
-
-final makeOfferProvider = StateNotifierProvider.autoDispose<MakeOfferController, AsyncValue<void>>((ref) {
-  return MakeOfferController(ref.watch(shopRepositoryProvider));
-});

@@ -8,6 +8,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart'; // <-- Vigilante de background
 import 'firebase_options.dart';
 
+// 👇 Importación del Gigante de Pagos: RevenueCat
+import 'package:purchases_flutter/purchases_flutter.dart';
+
 // Importaciones de nuestra arquitectura core
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
@@ -32,7 +35,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 👇 3. REGISTRAR AL VIGILANTE NOCTURNO
+  // 3. REGISTRAR AL VIGILANTE NOCTURNO
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // 4. Inicializar Supabase con las credenciales del .env
@@ -41,7 +44,15 @@ Future<void> main() async {
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
-  // 5. Arrancar la app envuelta en ProviderScope para que Riverpod funcione
+  // 👇 5. INICIALIZAR REVENUECAT (EL MOTOR DE PAGOS)
+  // Activamos el modo debug para ver en consola si la conexión a la tienda es exitosa
+  await Purchases.setLogLevel(LogLevel.debug);
+
+  // Public API Key de Android (goog_...)
+  PurchasesConfiguration configuration = PurchasesConfiguration("goog_uWJFeYTFeTBwYySobsHHTdTuHEV");
+  await Purchases.configure(configuration);
+
+  // 6. Arrancar la app envuelta en ProviderScope para que Riverpod funcione
   runApp(
     const ProviderScope(
       child: AnimeTradeApp(),
