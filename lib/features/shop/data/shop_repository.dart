@@ -34,10 +34,14 @@ class ShopRepository {
     }
   }
 
-  // --- 3. PROCESAR PAGO REAL DE GEMAS ---
+  // --- 3. PROCESAR PAGO REAL DE GEMAS (RevenueCat) ---
+  // 💡 Nota Senior: Por ahora hacemos la recarga de gemas aquí en el cliente.
+  // Para máxima seguridad en producción a gran escala, esto se debe hacer con "Webhooks"
+  // de RevenueCat avisándole a Supabase de forma secreta en el backend.
   Future<UserWallet> buyGemsWithRealMoney(Package package, int gemsReward) async {
     try {
-      final customerInfo = await Purchases.purchasePackage(package);
+      await Purchases.purchasePackage(package); // RevenueCat valida con Google/Apple
+
       final userId = _supabase.auth.currentUser!.id;
       final currentWallet = await getMyWallet();
       final newBalance = (currentWallet?.gems ?? 0) + gemsReward;
@@ -55,61 +59,46 @@ class ShopRepository {
     }
   }
 
-  // --- 4. COMPRAR EXPANSIÓN (Gasto Interno de Gemas) ---
+  // ======================================================================
+  // 🔥 SEGURIDAD ATÓMICA (LÓGICA MOVIDA AL SERVIDOR CON RPC)
+  // ======================================================================
+
+  // --- 4. COMPRAR EXPANSIÓN (Gasto Interno) ---
   Future<UserWallet> buyExtraSlots() async {
-    final userId = _supabase.auth.currentUser!.id;
-    const cost = 100;
-    final currentWallet = await getMyWallet();
-    if ((currentWallet?.gems ?? 0) < cost) throw Exception("💎 No tienes suficientes Gemas.");
-
-    final response = await _supabase.from('user_wallets').update({'gems': currentWallet!.gems - cost}).eq('user_id', userId).select().single();
-    final userRes = await _supabase.from('users').select('max_active_posts').eq('id', userId).single();
-
-    // 🔥 CAMBIO: Fallback a 5 para usuarios nuevos
-    final currentMax = userRes['max_active_posts'] as int? ?? 5;
-
-    await _supabase.from('users').update({'max_active_posts': currentMax + 10}).eq('id', userId);
-    return UserWallet.fromJson(response);
-  }
-
-  // --- 5. COMPRAR VIP (Gasto Interno de Gemas) ---
-  Future<UserWallet> buyVipStatus() async {
-    final userId = _supabase.auth.currentUser!.id;
-    const cost = 300;
-    final currentWallet = await getMyWallet();
-    if ((currentWallet?.gems ?? 0) < cost) throw Exception("💎 No tienes suficientes Gemas.");
-
-    final response = await _supabase.from('user_wallets').update({'gems': currentWallet!.gems - cost}).eq('user_id', userId).select().single();
-    await _supabase.from('users').update({'is_vip': true, 'max_active_posts': 9999}).eq('id', userId);
-    return UserWallet.fromJson(response);
-  }
-
-  // --- 6. DESTACAR PUBLICACIÓN (Gasto Interno de Gemas) ---
-  Future<UserWallet> boostPost(String postId) async {
-    final userId = _supabase.auth.currentUser!.id;
-    const cost = 50;
-
-    // 1. Verificamos si tiene saldo suficiente
-    final currentWallet = await getMyWallet();
-    if ((currentWallet?.gems ?? 0) < cost) {
-      // Usamos nuestro formato de error secreto para que la UI lo detecte si quieres
-      throw Exception("💎 No tienes suficientes Gemas para destacar esta carta.");
+    try {
+      final response = await _supabase.rpc('buy_extra_slots');
+      return UserWallet.fromJson(response as Map<String, dynamic>);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message); // El mensaje viene de la DB ("No tienes suficientes Gemas.")
+    } catch (e) {
+      throw Exception("Error de conexión al procesar la compra.");
     }
+  }
 
-    // 2. Cobramos las 50 gemas
-    final response = await _supabase
-        .from('user_wallets')
-        .update({'gems': currentWallet!.gems - cost})
-        .eq('user_id', userId)
-        .select()
-        .single();
+  // --- 5. COMPRAR VIP (Gasto Interno) ---
+  Future<UserWallet> buyVipStatus() async {
+    try {
+      final response = await _supabase.rpc('buy_vip_status');
+      return UserWallet.fromJson(response as Map<String, dynamic>);
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      throw Exception("Error de conexión al activar VIP.");
+    }
+  }
 
-    // 3. Encendemos el propulsor (is_boosted = true) en la carta elegida
-    await _supabase
-        .from('trades')
-        .update({'is_boosted': true})
-        .eq('id', postId);
-
-    return UserWallet.fromJson(response);
+  // --- 6. DESTACAR PUBLICACIÓN (Gasto Interno) ---
+  Future<UserWallet> boostPost(String postId) async {
+    try {
+      final response = await _supabase.rpc('buy_boost_pack', params: {
+        'p_post_id': postId
+      });
+      return UserWallet.fromJson(response as Map<String, dynamic>);
+    } on PostgrestException catch (e) {
+      // 💡 Esta excepción será capturada por la UI para levantar el modal de Gemas Insuficientes
+      throw Exception(e.message);
+    } catch (e) {
+      throw Exception("Error de conexión al destacar la publicación.");
+    }
   }
 }

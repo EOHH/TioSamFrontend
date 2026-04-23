@@ -8,6 +8,7 @@ class OfferRepository {
 
   OfferRepository(this._client);
 
+  // --- 1. ENVIAR OFERTA ---
   Future<void> submitOffer({
     required String postId,
     required String message,
@@ -21,29 +22,31 @@ class OfferRepository {
     });
   }
 
+  // --- 2. OBTENER OFERTAS RECIBIDAS ---
   Future<List<TradeOffer>> getReceivedOffers() async {
     final userId = _client.auth.currentUser!.id;
     final response = await _client
         .from('trade_offers')
-        .select('*, users!offerer_id(username, avatar_url), trades!inner(*, users(username, avatar_url))')
+        .select('*, users!offerer_id(username, avatar_url), trades!inner(*, users(username, avatar_url, is_vip))')
         .eq('trades.user_id', userId)
         .order('created_at', ascending: false);
 
     return (response as List).map((json) => TradeOffer.fromJson(json)).toList();
   }
 
+  // --- 3. OBTENER OFERTAS ENVIADAS ---
   Future<List<TradeOffer>> getSentOffers() async {
     final userId = _client.auth.currentUser!.id;
     final response = await _client
         .from('trade_offers')
-        .select('*, users!offerer_id(username, avatar_url), trades!inner(*, users(username, avatar_url))')
+        .select('*, users!offerer_id(username, avatar_url, is_vip), trades!inner(*, users(username, avatar_url))')
         .eq('offerer_id', userId)
         .order('created_at', ascending: false);
 
     return (response as List).map((json) => TradeOffer.fromJson(json)).toList();
   }
 
-  // Mantenemos el Stream en vivo para que el Chat reaccione al instante
+  // --- 4. ESCUCHAR CAMBIOS EN TIEMPO REAL (STREAM) ---
   Stream<Map<String, dynamic>> watchOfferStatus(String offerId) {
     return _client
         .from('trade_offers')
@@ -52,68 +55,46 @@ class OfferRepository {
         .map((event) => event.isNotEmpty ? event.first : {});
   }
 
-  // ==========================================
-  // 🔥 LA MÁQUINA DE ESTADOS (STATE MACHINE) 🔥
-  // ==========================================
+  // ======================================================================
+  // 🔥 LA MÁQUINA DE ESTADOS (STATE MACHINE - ATÓMICA VÍA RPC) 🔥
+  // ======================================================================
 
   // 1. ACEPTAR OFERTA (El Efecto Dominó)
   Future<void> acceptOffer(String offerId) async {
     try {
-      // a. Obtenemos de qué publicación es esta oferta
-      final offerData = await _client.from('trade_offers').select('post_id').eq('id', offerId).single();
-      final postId = offerData['post_id'];
-
-      // b. Aceptamos esta oferta en específico
-      await _client.from('trade_offers').update({'status': 'accepted'}).eq('id', offerId);
-
-      // c. Rechazamos automáticamente todas las demás ofertas PENDIENTES de esta misma carta
-      await _client.from('trade_offers').update({'status': 'rejected'})
-          .eq('post_id', postId)
-          .eq('status', 'pending') // Solo rechazamos las pendientes
-          .neq('id', offerId);
-
-      // d. 🔥 FIX: Cambiamos a 'in_progress'. Esto la oculta del Mercado (porque no es 'open'),
-      // pero avisa al Perfil que aún no está 'closed' (terminada).
-      await _client.from('trades').update({'status': 'in_progress'}).eq('id', postId);
+      await _client.rpc('accept_trade_offer', params: {'p_offer_id': offerId});
+    } on PostgrestException catch (e) {
+      throw Exception('Rechazado por el servidor: ${e.message}');
     } catch (e) {
-      throw Exception('Error al aceptar la oferta: $e');
+      throw Exception('Error de conexión al aceptar la oferta.');
     }
   }
 
   // 2. CANCELAR TRATO (El plan falló, la carta vuelve al mercado)
   Future<void> cancelTrade(String offerId) async {
     try {
-      final offerData = await _client.from('trade_offers').select('post_id').eq('id', offerId).single();
-      final postId = offerData['post_id'];
-
-      // a. Cancelamos la oferta (o la rechazamos)
-      await _client.from('trade_offers').update({'status': 'cancelled'}).eq('id', offerId);
-
-      // b. ¡La carta vuelve a estar disponible en el Mercado! ('open')
-      await _client.from('trades').update({'status': 'open'}).eq('id', postId);
+      await _client.rpc('cancel_trade_offer', params: {'p_offer_id': offerId});
+    } on PostgrestException catch (e) {
+      throw Exception('Rechazado por el servidor: ${e.message}');
     } catch (e) {
-      throw Exception('Error al cancelar el trato: $e');
+      throw Exception('Error de conexión al cancelar el trato.');
     }
   }
 
   // 3. COMPLETAR TRATO (Éxito Total)
   Future<void> completeTrade(String offerId) async {
     try {
-      final offerData = await _client.from('trade_offers').select('post_id').eq('id', offerId).single();
-      final postId = offerData['post_id'];
-
-      // a. Marcamos la oferta como completada
-      await _client.from('trade_offers').update({'status': 'completed'}).eq('id', offerId);
-
-      // b. 🔥 FIX: Ahora sí, la carta se marca como 'closed' (Completada totalmente)
-      await _client.from('trades').update({'status': 'closed'}).eq('id', postId);
+      await _client.rpc('complete_trade_offer', params: {'p_offer_id': offerId});
+    } on PostgrestException catch (e) {
+      throw Exception('Rechazado por el servidor: ${e.message}');
     } catch (e) {
-      throw Exception('Error al completar el trato: $e');
+      throw Exception('Error de conexión al completar el trato.');
     }
   }
 
-  // ==========================================
+  // ======================================================================
 
+  // --- ACTUALIZACIÓN MANUAL (Opcional, si la usas en otro lado) ---
   Future<void> updateOfferStatus(String offerId, String newStatus) async {
     await _client
         .from('trade_offers')
@@ -121,6 +102,7 @@ class OfferRepository {
         .eq('id', offerId);
   }
 
+  // --- ELIMINAR OFERTA ---
   Future<void> deleteOffer(String offerId) async {
     try {
       await _client.from('trade_offers').delete().eq('id', offerId);
@@ -129,6 +111,7 @@ class OfferRepository {
     }
   }
 
+  // --- ENVIAR RESEÑA ---
   Future<void> submitReview({
     required String offerId,
     required String revieweeId,
@@ -138,6 +121,7 @@ class OfferRepository {
     try {
       final reviewerId = _client.auth.currentUser!.id;
 
+      // Leemos a qué publicación pertenece esta oferta
       final offerData = await _client
           .from('trade_offers')
           .select('post_id')
@@ -160,6 +144,7 @@ class OfferRepository {
   }
 }
 
+// Proveedor
 final offerRepositoryProvider = Provider<OfferRepository>((ref) {
   return OfferRepository(ref.watch(supabaseClientProvider));
 });

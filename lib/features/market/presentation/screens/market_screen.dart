@@ -15,6 +15,7 @@ class MarketScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final marketState = ref.watch(marketFeedProvider);
+    final marketNotifier = ref.read(marketFeedProvider.notifier); // Para acceder a los métodos de paginación
     final categoriesState = ref.watch(categoriesProvider);
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -24,17 +25,33 @@ class MarketScreen extends HookConsumerWidget {
     final searchQuery = useState('');
     final selectedCategory = useState('Todas');
 
+    // 🔥 CONTROLADOR DE SCROLL
+    final scrollController = useScrollController();
+
+    // 📡 LA ANTENA DEL SCROLL INFINITO
     useEffect(() {
-      void listener() => searchQuery.value = searchController.text;
-      searchController.addListener(listener);
-      return () => searchController.removeListener(listener);
+      void listener() {
+        // Si el usuario bajó y está a menos de 200px del final de la lista...
+        if (scrollController.position.pixels >= scrollController.position.maxScrollExtent - 200) {
+          marketNotifier.fetchMore(); // ...trae las siguientes 15 cartas
+        }
+      }
+      scrollController.addListener(listener);
+      return () => scrollController.removeListener(listener);
+    }, [scrollController]);
+
+    useEffect(() {
+      void searchListener() => searchQuery.value = searchController.text;
+      searchController.addListener(searchListener);
+      return () => searchController.removeListener(searchListener);
     }, [searchController]);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.grey,
+      backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.grey.shade100,
       appBar: AppBar(
-        title: const Text('Mercado de Intercambio', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+        title: const Text('Mercado de Intercambio', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: -0.5)),
         elevation: 0,
+        backgroundColor: Colors.transparent,
       ),
       body: Column(
         children: [
@@ -57,14 +74,14 @@ class MarketScreen extends HookConsumerWidget {
                 )
                     : null,
                 filled: true,
-                fillColor: isDarkMode ? Colors.grey : Colors.grey,
+                fillColor: isDarkMode ? Colors.white10 : Colors.black.withOpacity(0.05),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
           ),
 
-          // --- FILTROS DE CATEGORÍA DINÁMICOS ---
+          // --- FILTROS DE CATEGORÍA ---
           Container(
             color: Theme.of(context).scaffoldBackgroundColor,
             height: 50,
@@ -96,31 +113,29 @@ class MarketScreen extends HookConsumerWidget {
             ),
           ),
 
-          // --- LISTA DE PUBLICACIONES ---
+          // --- LISTA DE PUBLICACIONES (SCROLL INFINITO) ---
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                // Forzamos la recarga desde internet ignorando el caché temporal
-                ref.invalidate(marketFeedProvider);
+                // Al arrastrar hacia arriba, reiniciamos la paginación desde cero
+                await marketNotifier.fetchInitial();
                 ref.invalidate(categoriesProvider);
               },
               child: marketState.when(
                 data: (trades) {
-                  // FILTRADO CON CATEGORÍA REAL Y BÚSQUEDA
                   final filteredTrades = trades.where((trade) {
                     final offerItem = (trade['offer_item'] ?? '').toString().toLowerCase();
                     final requestItem = (trade['request_item'] ?? '').toString().toLowerCase();
                     final query = searchQuery.value.toLowerCase();
 
                     final matchesSearch = query.isEmpty || offerItem.contains(query) || requestItem.contains(query);
-
                     final tradeCategory = trade['category'] ?? 'General';
                     final matchesCategory = selectedCategory.value == 'Todas' || tradeCategory == selectedCategory.value;
 
                     return matchesSearch && matchesCategory;
                   }).toList();
 
-                  if (filteredTrades.isEmpty) {
+                  if (filteredTrades.isEmpty && trades.isNotEmpty) {
                     return ListView(
                       children: [
                         const SizedBox(height: 100),
@@ -130,9 +145,7 @@ class MarketScreen extends HookConsumerWidget {
                               const Icon(LucideIcons.searchX, size: 64, color: Colors.grey),
                               const SizedBox(height: 16),
                               Text(
-                                searchQuery.value.isEmpty
-                                    ? 'No hay publicaciones activas.'
-                                    : 'No encontramos resultados.',
+                                searchQuery.value.isEmpty ? 'No hay cartas en esta categoría.' : 'No encontramos resultados.',
                                 style: const TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w500),
                               ),
                             ],
@@ -142,20 +155,29 @@ class MarketScreen extends HookConsumerWidget {
                     );
                   }
 
+                  // 🔥 AÑADIMOS +1 AL COUNT SI AÚN HAY MÁS PARA MOSTRAR EL SPINNER AL FONDO
+                  final itemCount = filteredTrades.length + (marketNotifier.hasReachedMax ? 0 : 1);
+
                   return ListView.builder(
-                    padding: const EdgeInsets.only(top: 8, bottom: 20),
-                    itemCount: filteredTrades.length,
+                    controller: scrollController, // 👈 Se inyecta aquí
+                    physics: const AlwaysScrollableScrollPhysics(), // Importante para que el RefreshIndicator funcione siempre
+                    padding: const EdgeInsets.only(top: 8, bottom: 40),
+                    itemCount: itemCount,
                     itemBuilder: (context, index) {
+                      // 🔄 Si llegamos al último item falso, mostramos el spinner
+                      if (index == filteredTrades.length) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+
                       final rawData = filteredTrades[index];
                       final user = rawData['users'] ?? {};
 
-                      // FIX DE IMAGEN: Verificamos que no sea un string vacío o nulo "mentiroso"
                       String? validImageUrl = rawData['image_url'];
-                      if (validImageUrl != null && validImageUrl.trim().isEmpty) {
-                        validImageUrl = null;
-                      }
+                      if (validImageUrl != null && validImageUrl.trim().isEmpty) validImageUrl = null;
 
-                      // 🔥 CREAMOS EL OBJETO TRADEPOST CON LOS DATOS PREMIUM
                       final post = TradePost(
                         id: rawData['id'],
                         userId: rawData['user_id'],
@@ -168,7 +190,6 @@ class MarketScreen extends HookConsumerWidget {
                         category: rawData['category'] ?? 'General',
                         createdAt: DateTime.parse(rawData['created_at']),
                         status: rawData['status'] ?? 'open',
-                        // ✨ AQUÍ ESTÁ LA MAGIA: Le pasamos la información VIP y Boost
                         isVip: user['is_vip'] ?? false,
                         isBoosted: rawData['is_boosted'] ?? false,
                       );
