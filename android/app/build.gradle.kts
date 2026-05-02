@@ -3,15 +3,12 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
     id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// 🔐 1. LEER EL ARCHIVO KEY.PROPERTIES EN KOTLIN
+// 🔐 Leer key.properties
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
@@ -24,15 +21,17 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // 🔥 FIX IMPORTANTE (DESUGARING)
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
-    // 🔐 2. CONFIGURAR LA FIRMA DE PRODUCCIÓN
+    // 🔐 Firma
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
@@ -52,12 +51,15 @@ android {
 
     buildTypes {
         getByName("release") {
-            // 🔐 3. APLICAR LA FIRMA AL COMPILAR EN MODO RELEASE
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
         }
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {

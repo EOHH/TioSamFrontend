@@ -50,7 +50,21 @@ class AuthRepository {
 
   // Cerrar sesión
   Future<void> signOut() async {
-    await _client.auth.signOut();
+    try {
+      final userId = _client.auth.currentUser?.id;
+
+      // 🛡️ 1. BORRAMOS EL TOKEN FCM (Evita el bug del Token Fantasma)
+      if (userId != null) {
+        await _client.from('users').update({
+          'fcm_token': null
+        }).eq('id', userId);
+      }
+
+      // 🚪 2. Ahora sí, cerramos la sesión de forma segura
+      await _client.auth.signOut();
+    } catch (e) {
+      throw Exception('Error al cerrar sesión: $e');
+    }
   }
 }
 

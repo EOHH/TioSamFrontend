@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../features/trades/domain/models/trade_post.dart';
+import '../utils/image_cache_manager.dart';
 
 class TradeCard extends StatelessWidget {
   final TradePost post;
@@ -113,7 +114,10 @@ class TradeCard extends StatelessWidget {
                           ),
                           child: CircleAvatar(
                             radius: 22,
-                            backgroundImage: CachedNetworkImageProvider(post.userAvatar),
+                            backgroundImage: CachedNetworkImageProvider(
+                              post.userAvatar,
+                              maxHeight: 150, // <-- CRÍTICO
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -228,6 +232,8 @@ class TradeCard extends StatelessWidget {
                   CachedNetworkImage(
                     imageUrl: img,
                     fit: BoxFit.cover,
+                    cacheManager: TioSamCacheManager.instance, // Usamos nuestro manager estricto
+                    memCacheHeight: 400, // <-- CRÍTICO: La imagen no se decodificará a más de 400px en RAM
                     placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                     errorWidget: (_, __, ___) => const Icon(LucideIcons.imageOff, color: Colors.grey),
                   )

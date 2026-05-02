@@ -1,15 +1,8 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
-// CORRECCIÓN: Quitamos el "* as" para que Deno lo lea correctamente
-import admin from 'npm:firebase-admin@11.11.1'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { JWT } from 'npm:google-auth-library@9'
 
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(Deno.env.get('FIREBASE_SERVICE_ACCOUNT') || '{}')
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  })
-}
-
-Deno.serve(async (req) => {
+serve(async (req) => {
   try {
     const payload = await req.json()
     const offer = payload.record
@@ -34,31 +27,44 @@ Deno.serve(async (req) => {
       .single()
 
     if (!owner || !owner.fcm_token) {
-      return new Response(JSON.stringify({ message: 'El usuario no tiene token FCM' }), { status: 200 })
+      return new Response(JSON.stringify({ message: 'Usuario sin token FCM' }), { status: 200 })
     }
 
-    const message = {
-          token: owner.fcm_token,
-          notification: {
-            title: '¡Nueva Oferta Recibida! 🚀',
-            body: `Alguien acaba de ofrecerte una carta por tu ${trade.offer_item}. ¡Abre la app para verla!`,
-          },
-          data: {
-            type: 'new_offer',
-            trade_id: offer.post_id.toString(), // ✅ CORREGIDO: Usamos el ID que viene en la oferta
-            offer_id: offer.id.toString()
-          }
+    // AUTH V1 MAGIA
+    const serviceAccount = JSON.parse(Deno.env.get('FIREBASE_SERVICE_ACCOUNT') || '{}')
+    const jwtClient = new JWT({
+      email: serviceAccount.client_email,
+      key: serviceAccount.private_key,
+      scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
+    });
+    const tokens = await jwtClient.authorize();
+
+    const fcmPayload = {
+      message: {
+        token: owner.fcm_token,
+        notification: {
+          title: '¡Nueva Oferta Recibida! 🚀',
+          body: `Alguien acaba de ofrecerte una carta por tu ${trade.offer_item}.`,
+        },
+        data: {
+          type: 'new_offer',
+          trade_id: String(offer.post_id),
+          offer_id: String(offer.id)
         }
+      }
+    };
 
-    await admin.messaging().send(message)
+    await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokens.access_token}`
+      },
+      body: JSON.stringify(fcmPayload)
+    });
 
-    return new Response(JSON.stringify({ success: true }), { 
-      status: 200, 
-      headers: { 'Content-Type': 'application/json' } 
-    })
-
+    return new Response(JSON.stringify({ success: true }), { status: 200 })
   } catch (error) {
-    console.error(error)
     return new Response(JSON.stringify({ error: error.message }), { status: 500 })
   }
 })
