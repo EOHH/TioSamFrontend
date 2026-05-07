@@ -50,15 +50,38 @@ class ShopController extends StateNotifier<AsyncValue<UserWallet?>> {
     }
   }
 
-  // --- 4. COMPRAR STATUS VIP (COLECCIONISTA PRO) ---
+  // --- 4. COMPRAR STATUS VIP (REVENUECAT REAL) ---
   Future<bool> purchaseVip() async {
     state = const AsyncLoading();
     try {
-      final updatedWallet = await _repository.buyVipStatus();
-      state = AsyncData(updatedWallet);
-      return true;
+      Offerings offerings = await Purchases.getOfferings();
+
+      if (offerings.current != null &&
+          offerings.current!.availablePackages.isNotEmpty) {
+
+        Package vipPackage = offerings.current!.availablePackages.firstWhere(
+              (pkg) =>
+          pkg.storeProduct.identifier.contains('vip') ||
+              pkg.packageType == PackageType.monthly,
+          orElse: () => offerings.current!.availablePackages.first,
+        );
+
+        final purchaseResult = await Purchases.purchase(
+          PurchaseParams.package(vipPackage),
+        );
+
+        final isPremium = purchaseResult.customerInfo.entitlements
+            .all['pro_status']?.isActive ?? false;
+
+        await loadWallet();
+
+        return isPremium;
+      } else {
+        throw Exception("No se encontraron paquetes VIP configurados en la tienda.");
+      }
     } catch (e, st) {
       state = AsyncError(e, st);
+      await loadWallet();
       return false;
     }
   }

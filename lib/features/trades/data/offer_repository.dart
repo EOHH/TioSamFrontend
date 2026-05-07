@@ -142,6 +142,36 @@ class OfferRepository {
       throw Exception('Error al enviar la reseña: $e');
     }
   }
+
+  // --- VERIFICAR SI YA CALIFICÓ ---
+  Future<bool> hasUserReviewed(String offerId) async {
+    try {
+      final userId = _client.auth.currentUser!.id;
+
+      // 1. Obtenemos a qué publicación pertenece esta oferta
+      final offerData = await _client
+          .from('trade_offers')
+          .select('post_id')
+          .eq('id', offerId)
+          .single();
+
+      final tradeId = offerData['post_id'];
+
+      // 2. Buscamos si ya existe una reseña tuya para este trade
+      final response = await _client
+          .from('reviews')
+          .select('id')
+          .eq('trade_id', tradeId)
+          .eq('reviewer_id', userId)
+          .maybeSingle(); // Usamos maybeSingle para que no lance error si no encuentra nada
+
+      // Si encuentra un ID, significa que ya calificaste (true). Si no, devuelve false.
+      return response != null;
+    } catch (e) {
+      // En caso de error, asumimos false para no bloquear la UI, o true por seguridad.
+      return false;
+    }
+  }
 }
 
 // Proveedor

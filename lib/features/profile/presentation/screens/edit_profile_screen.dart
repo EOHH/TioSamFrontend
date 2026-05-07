@@ -18,8 +18,9 @@ class EditProfileScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Inicializamos el input con el nombre actual
+    // Inicializamos los inputs con los datos actuales
     final nameController = useTextEditingController(text: currentProfile.username);
+    final emailController = useTextEditingController(text: currentProfile.email); // 🔥 NUEVO
     final selectedImage = useState<File?>(null);
 
     final isLoading = ref.watch(editProfileProvider).isLoading;
@@ -52,7 +53,6 @@ class EditProfileScreen extends HookConsumerWidget {
                     child: CircleAvatar(
                       radius: 60,
                       backgroundColor: Theme.of(context).colorScheme.surface,
-                      // Si seleccionó una foto, muestra el File. Si no, muestra la URL de Supabase.
                       backgroundImage: selectedImage.value != null
                           ? FileImage(selectedImage.value!) as ImageProvider
                           : CachedNetworkImageProvider(currentProfile.avatarUrl),
@@ -70,6 +70,16 @@ class EditProfileScreen extends HookConsumerWidget {
 
             // FORMULARIO
             CustomInput(controller: nameController, label: "Nombre de Usuario", icon: LucideIcons.user),
+            const SizedBox(height: 20),
+
+            // 🔥 NUEVO INPUT PARA CORREO
+            CustomInput(
+              controller: emailController,
+              label: "Correo Electrónico",
+              icon: LucideIcons.mail,
+              keyboardType: TextInputType.emailAddress, // Ayuda al teclado del celular
+            ),
+
             const SizedBox(height: 40),
 
             // BOTÓN GUARDAR
@@ -77,20 +87,34 @@ class EditProfileScreen extends HookConsumerWidget {
               width: double.infinity, height: 50,
               child: ElevatedButton(
                 onPressed: isLoading ? null : () async {
-                  if (nameController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El nombre no puede estar vacío')));
+                  final newName = nameController.text.trim();
+                  final newEmail = emailController.text.trim();
+
+                  if (newName.isEmpty || newEmail.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Los campos no pueden estar vacíos')));
                     return;
                   }
 
+                  // Validación básica de correo
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(newEmail)) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingresa un correo válido')));
+                    return;
+                  }
+
+                  // 🔥 AHORA ENVIAMOS EL CORREO TAMBIÉN
                   final success = await ref.read(editProfileProvider.notifier).updateProfileData(
-                    nameController.text.trim(),
+                    newName,
+                    newEmail, // Pasamos el correo como segundo parámetro
                     selectedImage.value,
                   );
 
                   if (success && context.mounted) {
-                    ref.invalidate(currentProfileProvider); // Refresca el perfil para que se vean los cambios
-                    context.pop(); // Regresa a la pantalla anterior
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Perfil actualizado con éxito! ✨'), backgroundColor: Colors.green));
+                    ref.invalidate(currentProfileProvider);
+                    context.pop();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('¡Perfil actualizado! (Si cambiaste tu correo, revisa tu bandeja de entrada) ✨'),
+                        backgroundColor: Colors.green
+                    ));
                   }
                 },
                 child: isLoading

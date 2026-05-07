@@ -11,7 +11,7 @@ import '../controllers/shop_controller.dart';
 class ShopScreen extends HookConsumerWidget {
   const ShopScreen({super.key});
 
-  final bool isDesignMode = false;
+  final bool isDesignMode = true;
 
   String _cleanTitle(String rawTitle) {
     final parts = rawTitle.split('(');
@@ -32,7 +32,7 @@ class ShopScreen extends HookConsumerWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), shape: BoxShape.circle),
               child: const Icon(LucideIcons.diamond, size: 48, color: Colors.redAccent),
             ),
             const SizedBox(height: 20),
@@ -45,7 +45,6 @@ class ShopScreen extends HookConsumerWidget {
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  // Opcional: Podrías usar un ScrollController aquí para deslizar la pantalla hacia los paquetes
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                 child: const Text('Ver Paquetes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -57,7 +56,7 @@ class ShopScreen extends HookConsumerWidget {
     );
   }
 
-  // 💎 MODAL DE CONFIRMACIÓN REUTILIZABLE
+  // 💎 MODAL DE CONFIRMACIÓN REUTILIZABLE (Para compras con gemas)
   void _showConfirmModal(BuildContext context, WidgetRef ref, {
     required String itemName, required int gemCost, required Color color, required IconData icon, required Future<bool> Function() onConfirm
   }) {
@@ -72,7 +71,7 @@ class ShopScreen extends HookConsumerWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: color.withOpacity(0.15), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), shape: BoxShape.circle),
               child: Icon(icon, size: 48, color: color),
             ),
             const SizedBox(height: 20),
@@ -93,17 +92,16 @@ class ShopScreen extends HookConsumerWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
-                      Navigator.pop(ctx); // Primero cerramos el modal
-                      final success = await onConfirm(); // Luego ejecutamos la compra
+                      Navigator.pop(ctx);
+                      final success = await onConfirm();
                       if (success && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Row(children: [const Icon(LucideIcons.checkCircle2, color: Colors.white), const SizedBox(width: 12), Text('¡Activado con éxito! 🎉', style: const TextStyle(fontWeight: FontWeight.bold))]),
+                            content: const Row(children: [Icon(LucideIcons.checkCircle2, color: Colors.white), SizedBox(width: 12), Text('¡Activado con éxito! 🎉', style: TextStyle(fontWeight: FontWeight.bold))]),
                             backgroundColor: Colors.green, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                         );
                       }
-                      // No necesitamos un "else" aquí, porque el ref.listen atrapará el error mágicamente.
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: color, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0),
                     child: const Text('Activar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
@@ -131,7 +129,7 @@ class ShopScreen extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10)))),
+              Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(10)))),
               const SizedBox(height: 24),
               const Row(
                 children: [
@@ -144,7 +142,6 @@ class ShopScreen extends HookConsumerWidget {
               const Text('Selecciona una de tus publicaciones disponibles para anclarla en lo más alto del mercado.', style: TextStyle(color: Colors.grey)),
               const SizedBox(height: 24),
 
-              // LA LISTA DE TUS CARTAS
               Expanded(
                 child: Consumer(
                   builder: (context, ref, child) {
@@ -176,7 +173,7 @@ class ShopScreen extends HookConsumerWidget {
                                   borderRadius: BorderRadius.circular(10),
                                   child: imageUrl != null && imageUrl.toString().isNotEmpty
                                       ? CachedNetworkImage(imageUrl: imageUrl, width: 60, height: 60, fit: BoxFit.cover)
-                                      : Container(width: 60, height: 60, color: Colors.blueAccent.withOpacity(0.1), child: const Icon(LucideIcons.image, color: Colors.blueAccent)),
+                                      : Container(width: 60, height: 60, color: Colors.blueAccent.withValues(alpha: 0.1), child: const Icon(LucideIcons.image, color: Colors.blueAccent)),
                                 ),
                                 title: Text(post['offer_item'] ?? 'Sin nombre', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                                 subtitle: Text('Busca: ${post['request_item'] ?? 'Cualquiera'}', style: const TextStyle(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -229,11 +226,9 @@ class ShopScreen extends HookConsumerWidget {
       if (next is AsyncError) {
         final errorMsg = next.error.toString();
 
-        // Si el error contiene palabras clave de falta de saldo...
         if (errorMsg.contains('suficientes Gemas') || errorMsg.contains('suficiente')) {
-          _showNotEnoughGemsDialog(context); // Lanzamos la ventana hermosa
+          _showNotEnoughGemsDialog(context);
         } else {
-          // Si es otro error (ej. se cayó el internet), mostramos la alerta roja normal
           ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                   content: Row(
@@ -266,7 +261,7 @@ class ShopScreen extends HookConsumerWidget {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: [Color(0xFF2196F3), Color(0xFF00BCD4)]),
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.blueAccent.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.blueAccent.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))],
               ),
               child: Row(
                 children: [
@@ -340,7 +335,7 @@ class ShopScreen extends HookConsumerWidget {
     );
   }
 
-  // --- WIDGETS DE UI (INTACTOS) ---
+  // --- WIDGETS DE UI ---
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
@@ -348,23 +343,46 @@ class ShopScreen extends HookConsumerWidget {
     );
   }
 
+  // 👑 CARTA VIP MEJORADA CON PRECIO DINÁMICO DE REVENUECAT
   Widget _buildVIPCard(BuildContext context, WidgetRef ref) {
+    final packagesState = ref.watch(storePackagesProvider);
+
+    String priceText = 'Cargando...';
+
+    // Extraemos el precio real de la tienda (Google Play / Apple)
+    packagesState.whenData((packages) {
+      final vipPkgs = packages.where((p) => p.storeProduct.identifier.contains('vip') || p.packageType == PackageType.monthly);
+      if (vipPkgs.isNotEmpty) {
+        priceText = '${vipPkgs.first.storeProduct.priceString} / mes';
+      } else {
+        priceText = 'Suscribirse';
+      }
+    });
+
     return _AnimatedScaleButton(
-      onTap: () => _showConfirmModal(context, ref, itemName: 'Coleccionista PRO', gemCost: 300, color: Colors.amber, icon: LucideIcons.crown, onConfirm: () async => await ref.read(shopControllerProvider.notifier).purchaseVip()),
+      // Ya no mostramos un modal de gemas. Va directo al pago nativo.
+      onTap: () async {
+        final success = await ref.read(shopControllerProvider.notifier).purchaseVip();
+        if (success && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('¡Bienvenido al club PRO! 👑'), backgroundColor: Colors.amber)
+          );
+        }
+      },
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
             gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFF8C00)], begin: Alignment.topLeft, end: Alignment.bottomRight),
             borderRadius: BorderRadius.circular(32),
-            boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10))]
+            boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 10))]
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle), child: const Icon(LucideIcons.crown, color: Colors.white, size: 32)),
+                Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle), child: const Icon(LucideIcons.crown, color: Colors.white, size: 32)),
                 const SizedBox(width: 16),
                 const Expanded(
                   child: Column(
@@ -386,11 +404,10 @@ class ShopScreen extends HookConsumerWidget {
               width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
               alignment: Alignment.center,
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Suscribirse por 300 ', style: TextStyle(color: Color(0xFFFF8C00), fontWeight: FontWeight.w900, fontSize: 18)),
-                  Icon(LucideIcons.gem, color: Color(0xFFFF8C00), size: 18),
+                  Text(priceText, style: const TextStyle(color: Color(0xFFFF8C00), fontWeight: FontWeight.w900, fontSize: 18)),
                 ],
               ),
             )
@@ -408,13 +425,13 @@ class ShopScreen extends HookConsumerWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(28),
-          boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 8))],
-          border: Border.all(color: color.withOpacity(0.15), width: 1.5),
+          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 15, offset: const Offset(0, 8))],
+          border: Border.all(color: color.withValues(alpha: 0.15), width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 32)),
+            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 32)),
             const SizedBox(height: 20),
             Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, height: 1.2)),
             const SizedBox(height: 16),
@@ -463,9 +480,12 @@ class ShopScreen extends HookConsumerWidget {
         final packagesState = ref.watch(storePackagesProvider);
         return packagesState.when(
           data: (packages) {
-            if (packages.isEmpty) return const Center(child: Text('La tienda está vacía.'));
+            // Filtramos para que no muestre el paquete VIP en la lista de gemas, ya que tiene su propio botón grande arriba
+            final gemPackages = packages.where((p) => !p.storeProduct.identifier.contains('vip') && p.packageType != PackageType.monthly).toList();
+
+            if (gemPackages.isEmpty) return const Center(child: Text('La tienda está vacía.'));
             return Column(
-              children: packages.map((package) {
+              children: gemPackages.map((package) {
                 int gemsReward = 100;
                 IconData dynIcon = LucideIcons.gem;
                 if (package.storeProduct.identifier.contains('500')) { gemsReward = 500; dynIcon = LucideIcons.component; }
@@ -513,12 +533,12 @@ class _GemPackageUI extends StatelessWidget {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [BoxShadow(color: isPopular ? primaryColor.withOpacity(0.2) : Colors.black.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 15, offset: const Offset(0, 8))],
-            border: isPopular ? Border.all(color: primaryColor, width: 2) : Border.all(color: Colors.grey.withOpacity(isDark ? 0.1 : 0.2)),
+            boxShadow: [BoxShadow(color: isPopular ? primaryColor.withValues(alpha: 0.2) : Colors.black.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 15, offset: const Offset(0, 8))],
+            border: isPopular ? Border.all(color: primaryColor, width: 2) : Border.all(color: Colors.grey.withValues(alpha: isDark ? 0.1 : 0.2)),
           ),
           child: Row(
             children: [
-              Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: primaryColor.withOpacity(0.15), shape: BoxShape.circle), child: Icon(icon, color: primaryColor, size: 32)),
+              Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(icon, color: primaryColor, size: 32)),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -543,7 +563,7 @@ class _GemPackageUI extends StatelessWidget {
             top: -12, left: 24,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFFF3B30), Color(0xFFFF9500)]), borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4))]),
+              decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFFF3B30), Color(0xFFFF9500)]), borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4))]),
               child: const Text('MÁS POPULAR', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
             ),
           ),

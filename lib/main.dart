@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'core/providers/revenuecat_provider.dart';
 import 'firebase_options.dart';
 
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -44,6 +45,8 @@ class AnimeTradeApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+
+    ref.watch(isVipProvider);
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(

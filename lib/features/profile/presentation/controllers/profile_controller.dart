@@ -37,10 +37,14 @@ class EditProfileController extends StateNotifier<AsyncValue<void>> {
 
   EditProfileController(this._repository) : super(const AsyncData(null));
 
-  Future<bool> updateProfileData(String newUsername, File? newImage) async {
+  // 🔥 AHORA RECIBE EL CORREO COMO SEGUNDO PARÁMETRO
+  Future<bool> updateProfileData(String newUsername, String newEmail, File? newImage) async {
     state = const AsyncLoading();
 
     final result = await AsyncValue.guard(() async {
+      final supabase = Supabase.instance.client;
+      final currentUserEmail = supabase.auth.currentUser?.email;
+
       String? newAvatarUrl;
 
       // 1. Si el usuario seleccionó una foto, la subimos primero
@@ -49,8 +53,16 @@ class EditProfileController extends StateNotifier<AsyncValue<void>> {
         if (newAvatarUrl == null) throw Exception("Error al subir el avatar");
       }
 
-      // 2. Actualizamos el nombre (y la URL de la foto si hay una nueva)
-      await _repository.updateProfile(username: newUsername, avatarUrl: newAvatarUrl);
+      await _repository.updateProfile(username: newUsername, email: newEmail, avatarUrl: newAvatarUrl);
+
+      // 🔥 3. ACTUALIZAMOS EL CORREO DE AUTENTICACIÓN (SUPER IMPORTANTE)
+      // Solo hacemos la llamada si el correo realmente cambió
+      if (newEmail != currentUserEmail && newEmail.isNotEmpty) {
+        await supabase.auth.updateUser(
+          UserAttributes(email: newEmail),
+        );
+        // Supabase enviará automáticamente un correo de confirmación a la nueva dirección.
+      }
     });
 
     state = result;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart'; // Añadido para el 3D
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../features/trades/domain/models/trade_post.dart';
@@ -33,7 +34,6 @@ class TradeCard extends StatelessWidget {
     final bool isBoosted = post.isBoosted;
     final bool isVip = post.isVip;
 
-    // Paleta de colores Premium
     final Color goldColor = isDark ? const Color(0xFFFFD700) : const Color(0xFFD4AF37);
     final Color boostColor = Colors.orangeAccent;
 
@@ -41,7 +41,6 @@ class TradeCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        // ✨ Aura exterior solo para destacados (Efecto Resplandor)
         boxShadow: [
           if (isBoosted)
             BoxShadow(
@@ -61,7 +60,6 @@ class TradeCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            // ✨ Borde inteligente: Dorado para VIP, Naranja fuego para Boosted
             border: Border.all(
               color: isBoosted
                   ? boostColor
@@ -71,7 +69,6 @@ class TradeCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // 🚀 Banner de Publicación Destacada (Solo si es Boosted)
               if (isBoosted)
                 Container(
                   width: double.infinity,
@@ -116,7 +113,7 @@ class TradeCard extends StatelessWidget {
                             radius: 22,
                             backgroundImage: CachedNetworkImageProvider(
                               post.userAvatar,
-                              maxHeight: 150, // <-- CRÍTICO
+                              maxHeight: 150,
                             ),
                           ),
                         ),
@@ -153,12 +150,13 @@ class TradeCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
 
-                    // --- CARDS VIEW ---
+                    // --- CARDS VIEW 3D ---
                     Row(
                       children: [
-                        Expanded(child: _buildItemNode(context, post.offerItemName, post.offerItemImage, true)),
+                        // Inyectamos el nuevo widget Holográfico aquí
+                        Expanded(child: HolographicItemNode(name: post.offerItemName, img: post.offerItemImage, isOffer: true)),
                         _buildExchangeDivider(isDark),
-                        Expanded(child: _buildItemNode(context, post.requestItemName, null, false)),
+                        Expanded(child: HolographicItemNode(name: post.requestItemName, img: null, isOffer: false)),
                       ],
                     ),
 
@@ -206,73 +204,6 @@ class TradeCard extends StatelessWidget {
     );
   }
 
-  Widget _buildItemNode(BuildContext context, String name, String? img, bool isOffer) {
-    final color = isOffer ? Colors.cyan.shade400 : Colors.purpleAccent.shade100;
-
-    return Column(
-      children: [
-        Text(
-          isOffer ? 'OFRECE' : 'BUSCA',
-          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 160,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            color: Colors.grey.withOpacity(0.05),
-            border: Border.all(color: color.withOpacity(0.2), width: 1.5),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (img != null && img.isNotEmpty)
-                  CachedNetworkImage(
-                    imageUrl: img,
-                    fit: BoxFit.cover,
-                    cacheManager: TioSamCacheManager.instance, // Usamos nuestro manager estricto
-                    memCacheHeight: 400, // <-- CRÍTICO: La imagen no se decodificará a más de 400px en RAM
-                    placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                    errorWidget: (_, __, ___) => const Icon(LucideIcons.imageOff, color: Colors.grey),
-                  )
-                else
-                  Center(child: Icon(isOffer ? LucideIcons.gift : LucideIcons.search, size: 40, color: color.withOpacity(0.2))),
-
-                // Overlay de texto con gradiente cinemático
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withOpacity(0.05), Colors.black.withOpacity(0.8)],
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Text(
-                      name,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, height: 1.1),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildExchangeDivider(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -284,6 +215,167 @@ class TradeCard extends StatelessWidget {
         ),
         child: Icon(LucideIcons.repeat, size: 18, color: isDark ? Colors.white60 : Colors.black45),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// NUEVO WIDGET: CARTA HOLOGRÁFICA 3D
+// Reemplaza a la antigua función _buildItemNode
+// ---------------------------------------------------------
+class HolographicItemNode extends HookWidget {
+  final String name;
+  final String? img;
+  final bool isOffer;
+
+  const HolographicItemNode({
+    super.key,
+    required this.name,
+    this.img,
+    required this.isOffer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isOffer ? Colors.cyan.shade400 : Colors.purpleAccent.shade100;
+
+    // Controladores de rotación y brillo
+    final rx = useState(0.0);
+    final ry = useState(0.0);
+    final glareX = useState(0.5);
+    final glareY = useState(0.5);
+
+    return Column(
+      children: [
+        Text(
+          isOffer ? 'OFRECE' : 'BUSCA',
+          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onPanUpdate: (details) {
+            final RenderBox box = context.findRenderObject() as RenderBox;
+            final localPosition = box.globalToLocal(details.globalPosition);
+
+            // Calculamos la inclinación basada en el dedo
+            final percentageX = (localPosition.dx / box.size.width) - 0.5;
+            final percentageY = (localPosition.dy / box.size.height) - 0.5;
+
+            ry.value = percentageX * 0.4; // Intensidad de rotación
+            rx.value = -percentageY * 0.4;
+
+            glareX.value = percentageX + 0.5;
+            glareY.value = percentageY + 0.5;
+          },
+          onPanEnd: (_) {
+            rx.value = 0.0;
+            ry.value = 0.0;
+            glareX.value = 0.5;
+            glareY.value = 0.5;
+          },
+          onPanCancel: () {
+            rx.value = 0.0;
+            ry.value = 0.0;
+          },
+          child: TweenAnimationBuilder(
+            tween: Tween<double>(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 150),
+            builder: (context, val, child) {
+              final transform = Matrix4.identity()
+                ..setEntry(3, 2, 0.002) // Perspectiva 3D
+                ..rotateX(rx.value)
+                ..rotateY(ry.value);
+
+              return Transform(
+                alignment: Alignment.center,
+                transform: transform,
+                child: child,
+              );
+            },
+            child: Container(
+              height: 160,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                color: Colors.grey.withOpacity(0.05),
+                border: Border.all(color: color.withOpacity(0.2), width: 1.5),
+                // Sombra dinámica que reacciona a la inclinación
+                boxShadow: rx.value != 0 || ry.value != 0
+                    ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: Offset(-ry.value * 30, -rx.value * 30),
+                  )
+                ]
+                    : [],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 1. Imagen base
+                    if (img != null && img!.isNotEmpty)
+                      CachedNetworkImage(
+                        imageUrl: img!,
+                        fit: BoxFit.cover,
+                        cacheManager: TioSamCacheManager.instance,
+                        memCacheHeight: 400,
+                        placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                        errorWidget: (_, __, ___) => const Icon(LucideIcons.imageOff, color: Colors.grey),
+                      )
+                    else
+                      Center(child: Icon(isOffer ? LucideIcons.gift : LucideIcons.search, size: 40, color: color.withOpacity(0.2))),
+
+                    // 2. Gradiente inferior negro para el texto
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black.withOpacity(0.05), Colors.black.withOpacity(0.8)],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // 3. Brillo Holográfico Dinámico (Glare)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 50),
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment((glareX.value - 0.5) * 3, (glareY.value - 0.5) * 3),
+                          radius: 1.2,
+                          colors: [
+                            Colors.white.withOpacity(rx.value != 0 ? 0.3 : 0.0), // Solo brilla al tocar
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // 4. Texto
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Text(
+                          name,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, height: 1.1),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

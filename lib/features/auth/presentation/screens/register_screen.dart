@@ -20,7 +20,9 @@ class RegisterScreen extends HookConsumerWidget {
 
     ref.listen<AsyncValue<void>>(authControllerProvider, (_, next) {
       if (next is AsyncError) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(next.error.toString()), backgroundColor: Colors.redAccent));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(next.error.toString()), backgroundColor: Colors.redAccent)
+        );
       }
     });
 
@@ -40,7 +42,7 @@ class RegisterScreen extends HookConsumerWidget {
                   child: const Text('Gremio!', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900)),
                 ),
                 const SizedBox(height: 6),
-                Text('Prepara tu mazo para intercambiar', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13)),
+                Text('Prepara tu mazo para intercambiar', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
                 const SizedBox(height: 30),
 
                 CustomInput(controller: usernameController, label: 'Nombre de usuario (Otaku Name)', icon: LucideIcons.user),
@@ -56,9 +58,51 @@ class RegisterScreen extends HookConsumerWidget {
                   isLoading: authState.isLoading,
                   onTap: authState.isLoading ? null : () {
                     FocusScope.of(context).unfocus();
-                    ref.read(authControllerProvider.notifier).signUp(
-                        emailController.text.trim(), passwordController.text.trim(), usernameController.text.trim()
-                    );
+
+                    final username = usernameController.text.trim();
+                    final email = emailController.text.trim().toLowerCase();
+                    final password = passwordController.text.trim();
+
+                    // 1. Validar campos vacíos
+                    if (username.isEmpty || email.isEmpty || password.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Por favor, llena todos los campos.'))
+                      );
+                      return;
+                    }
+
+                    // 2. Validar formato básico para poder extraer el dominio
+                    if (!email.contains('@')) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Formato de correo inválido.'))
+                      );
+                      return;
+                    }
+
+                    // 3. Bloqueamos dominios que sabemos que son falsos o temporales
+                    final blockedDomains = ['test.com', 'example.com', 'asdf.com', 'yopmail.com', 'mailinator.com', '123.com'];
+                    final domain = email.split('@').last;
+
+                    if (blockedDomains.contains(domain)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Por favor, usa un proveedor de correo válido (Gmail, Outlook, etc).'),
+                            backgroundColor: Colors.orange,
+                          )
+                      );
+                      return;
+                    }
+
+                    // 4. Validamos el formato correcto (Regex estricto)
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Formato de correo inválido.'))
+                      );
+                      return;
+                    }
+
+                    // 🔥 SI PASA TODAS LAS PRUEBAS, LLAMAMOS A SUPABASE
+                    ref.read(authControllerProvider.notifier).signUp(email, password, username);
                   },
                 ),
               ],
@@ -73,7 +117,7 @@ class RegisterScreen extends HookConsumerWidget {
             child: IconButton(
               icon: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.1)),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.1)),
                 child: const Icon(LucideIcons.arrowLeft, color: Colors.white, size: 20),
               ),
               onPressed: () => context.pop(),

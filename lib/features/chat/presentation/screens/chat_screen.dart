@@ -16,13 +16,17 @@ import '../../data/chat_repository.dart';
 import '../controllers/chat_controller.dart';
 import '../controllers/presence_controller.dart';
 
-// 👇 NUEVO PROVIDER PARA ESCUCHAR EL ESTADO DE LA OFERTA EN VIVO
+// --- PROVIDERS ---
 final offerStatusProvider = StreamProvider.family<Map<String, dynamic>, String>((ref, offerId) {
   final repository = ref.read(offerRepositoryProvider);
   return repository.watchOfferStatus(offerId);
 });
 
-// Colores exactos de WhatsApp
+// 👇 NUEVO: Provider para verificar si el usuario actual ya calificó este trato
+final hasReviewedProvider = FutureProvider.family.autoDispose<bool, String>((ref, offerId) {
+  return ref.read(offerRepositoryProvider).hasUserReviewed(offerId);
+});
+
 class WAColors {
   static const bubbleMeLight = Color(0xFFDCF8C6);
   static const bubbleMeDark = Color(0xFF056162);
@@ -57,7 +61,6 @@ class ChatScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final messageController = useTextEditingController();
     final isUploading = useState(false);
-
     final hasText = useState(false);
     final isRecording = useState(false);
     final audioRecorder = useMemoized(() => AudioRecorder());
@@ -68,21 +71,28 @@ class ChatScreen extends HookConsumerWidget {
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // MAGIA DE PRESENCIA: Escuchamos si está en línea
+    // MAGIA REALTIME
     final onlineUsers = ref.watch(presenceProvider);
     final isOnline = onlineUsers.contains(contactId);
 
-    // 👇 ESCUCHAMOS LOS ESTADOS EN VIVO DESDE SUPABASE
+    final isTyping = ref.watch(typingProvider(offerId));
+    final typingController = ref.read(typingProvider(offerId).notifier);
+
+    // ESTADO DE LA OFERTA
     final offerData = ref.watch(offerStatusProvider(offerId)).asData?.value;
     final isCompleted = offerData?['status'] == 'completed';
     final isCancelled = offerData?['status'] == 'cancelled' || offerData?['status'] == 'rejected';
 
-    // 🔥 LA MAGIA DE LOS PERMISOS: Solo el dueño de la publicación puede cerrar el trato
-    // Comparamos el ID del ofertante con tu ID. Si NO eres el ofertante, significa que eres el dueño.
     final isOfferer = offerData?['offerer_id'] == myUserId;
     final isPostOwner = !isOfferer && offerData != null;
 
+    // 👇 ESTADO DE RESEÑA: Verificamos si ya calificó
+    final hasReviewedAsync = ref.watch(hasReviewedProvider(offerId));
+    final hasReviewed = hasReviewedAsync.value ?? true; // Asume true mientras carga para evitar parpadeos
+
     final currentMessages = chatState.asData?.value ?? [];
+
+    // DOBLE CHECK AZUL
     useEffect(() {
       if (currentMessages.isNotEmpty) {
         final unreadExist = currentMessages.any((m) => m.senderId != myUserId && !m.isRead);
@@ -93,9 +103,16 @@ class ChatScreen extends HookConsumerWidget {
       return null;
     }, [currentMessages.length]);
 
+    // DETECTOR DE TECLADO
     useEffect(() {
       void listener() {
-        hasText.value = messageController.text.trim().isNotEmpty;
+        final currentText = messageController.text;
+        final nowHasText = currentText.isNotEmpty;
+
+        if (nowHasText != hasText.value) {
+          hasText.value = nowHasText;
+          typingController.sendTypingEvent(nowHasText);
+        }
       }
       messageController.addListener(listener);
       return () {
@@ -110,6 +127,7 @@ class ChatScreen extends HookConsumerWidget {
           final tempPath = '${Directory.systemTemp.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
           await audioRecorder.start(const RecordConfig(), path: tempPath);
           isRecording.value = true;
+          typingController.sendTypingEvent(true);
         }
       } catch (e) {
         debugPrint("Error al iniciar grabación: $e");
@@ -120,6 +138,7 @@ class ChatScreen extends HookConsumerWidget {
       try {
         final path = await audioRecorder.stop();
         isRecording.value = false;
+        typingController.sendTypingEvent(false);
 
         if (path != null) {
           isUploading.value = true;
@@ -135,9 +154,171 @@ class ChatScreen extends HookConsumerWidget {
     void sendTextMessage() {
       final text = messageController.text.trim();
       if (text.isNotEmpty) {
+        typingController.sendTypingEvent(false);
         chatAction.sendMessage(offerId: offerId, message: text);
         messageController.clear();
       }
+    }
+
+    // 🔥 EXTRAÍMOS EL MODAL DE CALIFICACIÓN PARA REUTILIZARLO
+    void _showRatingModal() {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (bottomSheetContext) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+            left: 20, right: 20, top: 20,
+          ),
+          child: HookBuilder(
+            builder: (hookContext) {
+              final rating = useState<int>(5);
+              final commentController = useTextEditingController();
+              final isSubmitting = useState(false);
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(radius: 30, backgroundImage: CachedNetworkImageProvider(contactAvatar)),
+                  const SizedBox(height: 10),
+                  Text('Califica a $contactName', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < rating.value ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                          size: 40,
+                        ),
+                        onPressed: () => rating.value = index + 1,
+                      );
+                    }),
+                  ),
+
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText: '¿Cómo fue tu experiencia?',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, padding: const EdgeInsets.symmetric(vertical: 15)),
+                      onPressed: isSubmitting.value ? null : () async {
+                        isSubmitting.value = true;
+                        try {
+                          await ref.read(offerRepositoryProvider).submitReview(
+                            offerId: offerId,
+                            revieweeId: contactId,
+                            rating: rating.value,
+                            comment: commentController.text.trim(),
+                          );
+
+                          // ✨ MAGIA: Refrescamos el provider al instante para ocultar el botón
+                          ref.invalidate(hasReviewedProvider(offerId));
+
+                          if (hookContext.mounted) {
+                            Navigator.pop(hookContext);
+                            ScaffoldMessenger.of(hookContext).showSnackBar(const SnackBar(content: Text('¡Gracias por tu reseña! ⭐'), backgroundColor: Colors.green));
+                          }
+                        } catch (e) {
+                          if (hookContext.mounted) {
+                            ScaffoldMessenger.of(hookContext).showSnackBar(SnackBar(content: Text('Error: $e')));
+                          }
+                        } finally {
+                          isSubmitting.value = false;
+                        }
+                      },
+                      child: isSubmitting.value
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Enviar Calificación', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    void _confirmCompletion() {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          title: const Row(children: [Icon(Icons.handshake, color: Colors.blue), SizedBox(width: 10), Text('¿Cerrar el Trato?')]),
+          content: Text('¿Ya realizaste el intercambio con $contactName? Esto cerrará la oferta de forma permanente.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Aún no', style: TextStyle(color: Colors.grey))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await ref.read(offerRepositoryProvider).completeTrade(offerId);
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Intercambio completado exitosamente! 🎉'), backgroundColor: Colors.blue));
+                    // Llamamos a nuestro modal reutilizable
+                    _showRatingModal();
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                  }
+                }
+              },
+              child: const Text('Sí, completado'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    void _cancelTrade() {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          title: const Row(children: [Icon(LucideIcons.xCircle, color: Colors.red), SizedBox(width: 10), Text('¿Cancelar Trato?')]),
+          content: const Text('Si no llegaron a un acuerdo, puedes cancelar este trato. Tu carta volverá al mercado para recibir otras ofertas.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Volver', style: TextStyle(color: Colors.grey))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await ref.read(offerRepositoryProvider).cancelTrade(offerId);
+
+                  if (context.mounted) {
+                    context.pop();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Intercambio cancelado. Tu carta está de vuelta en el mercado.'), backgroundColor: Colors.red));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+              child: const Text('Sí, cancelar'),
+            ),
+          ],
+        ),
+      );
     }
 
     Future<void> sendImageMessage(ImageSource source) async {
@@ -156,25 +337,11 @@ class ChatScreen extends HookConsumerWidget {
                 initAspectRatio: CropAspectRatioPreset.original,
                 lockAspectRatio: false,
                 hideBottomControls: false,
-                aspectRatioPresets: [
-                  CropAspectRatioPreset.square,
-                  CropAspectRatioPreset.ratio3x2,
-                  CropAspectRatioPreset.original,
-                  CropAspectRatioPreset.ratio4x3,
-                  CropAspectRatioPreset.ratio16x9
-                ],
               ),
               IOSUiSettings(
                 title: 'Recortar',
                 cancelButtonTitle: 'Cancelar',
                 doneButtonTitle: 'Listo',
-                aspectRatioPresets: [
-                  CropAspectRatioPreset.square,
-                  CropAspectRatioPreset.ratio3x2,
-                  CropAspectRatioPreset.original,
-                  CropAspectRatioPreset.ratio4x3,
-                  CropAspectRatioPreset.ratio16x9
-                ],
               ),
             ],
           );
@@ -221,163 +388,6 @@ class ChatScreen extends HookConsumerWidget {
       );
     }
 
-    void _confirmCompletion() {
-      showDialog(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          title: const Row(children: [Icon(Icons.handshake, color: Colors.blue), SizedBox(width: 10), Text('¿Cerrar el Trato?')]),
-          content: Text('¿Ya realizaste el intercambio con $contactName? Esto cerrará la oferta de forma permanente.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Aún no', style: TextStyle(color: Colors.grey))),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-              onPressed: () async {
-                Navigator.pop(dialogContext); // Cerramos el primer diálogo
-                try {
-                  // 🔥 LLAMAMOS A LA NUEVA FUNCIÓN QUE CIERRA EL TRATO
-                  await ref.read(offerRepositoryProvider).completeTrade(offerId);
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Intercambio completado exitosamente! 🎉'), backgroundColor: Colors.blue));
-
-                    // ¡MAGIA! Abrimos el modal para calificar al usuario
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true, // Para que el teclado no lo tape
-                      backgroundColor: Theme.of(context).colorScheme.surface,
-                      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-                      builder: (bottomSheetContext) => Padding(
-                        padding: EdgeInsets.only(
-                          bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom, // Evita el teclado
-                          left: 20, right: 20, top: 20,
-                        ),
-                        child: HookBuilder( // Usamos HookBuilder para manejar las estrellas en vivo
-                          builder: (hookContext) {
-                            final rating = useState<int>(5); // 5 estrellas por defecto
-                            final commentController = useTextEditingController();
-                            final isSubmitting = useState(false);
-
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                CircleAvatar(radius: 30, backgroundImage: CachedNetworkImageProvider(contactAvatar)),
-                                const SizedBox(height: 10),
-                                Text('Califica a $contactName', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 10),
-
-                                // Estrellas interactivas
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: List.generate(5, (index) {
-                                    return IconButton(
-                                      icon: Icon(
-                                        index < rating.value ? Icons.star : Icons.star_border,
-                                        color: Colors.amber,
-                                        size: 40,
-                                      ),
-                                      onPressed: () => rating.value = index + 1,
-                                    );
-                                  }),
-                                ),
-
-                                const SizedBox(height: 10),
-                                TextField(
-                                  controller: commentController,
-                                  maxLines: 3,
-                                  decoration: InputDecoration(
-                                    hintText: '¿Cómo fue tu experiencia?',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, padding: const EdgeInsets.symmetric(vertical: 15)),
-                                    onPressed: isSubmitting.value ? null : () async {
-                                      isSubmitting.value = true;
-                                      try {
-                                        // Enviamos la reseña a Supabase
-                                        await ref.read(offerRepositoryProvider).submitReview(
-                                          offerId: offerId,
-                                          revieweeId: contactId,
-                                          rating: rating.value,
-                                          comment: commentController.text.trim(),
-                                        );
-                                        if (hookContext.mounted) {
-                                          Navigator.pop(hookContext);
-                                          ScaffoldMessenger.of(hookContext).showSnackBar(const SnackBar(content: Text('¡Gracias por tu reseña! ⭐'), backgroundColor: Colors.green));
-                                        }
-                                      } catch (e) {
-                                        if (hookContext.mounted) {
-                                          ScaffoldMessenger.of(hookContext).showSnackBar(SnackBar(content: Text('Error: $e')));
-                                        }
-                                      } finally {
-                                        isSubmitting.value = false;
-                                      }
-                                    },
-                                    child: isSubmitting.value
-                                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                        : const Text('Enviar Calificación', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-                  }
-                }
-              },
-              child: const Text('Sí, completado'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    void _cancelTrade() {
-      showDialog(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          title: const Row(children: [Icon(LucideIcons.xCircle, color: Colors.red), SizedBox(width: 10), Text('¿Cancelar Trato?')]),
-          content: const Text('Si no llegaron a un acuerdo, puedes cancelar este trato. Tu carta volverá al mercado para recibir otras ofertas.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Volver', style: TextStyle(color: Colors.grey))),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                try {
-                  // 🔥 LLAMAMOS A LA NUEVA FUNCIÓN QUE CANCELA Y LIBERA LA CARTA
-                  await ref.read(offerRepositoryProvider).cancelTrade(offerId);
-
-                  if (context.mounted) {
-                    context.pop(); // Sacamos al usuario de la pantalla de chat si la canceló
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Intercambio cancelado. Tu carta está de vuelta en el mercado.'), backgroundColor: Colors.red));
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-              child: const Text('Sí, cancelar'),
-            ),
-          ],
-        ),
-      );
-    }
-
     Color getBubbleColor(bool isMe) {
       if (isMe) {
         return isDarkMode ? WAColors.bubbleMeDark : WAColors.bubbleMeLight;
@@ -393,9 +403,9 @@ class ChatScreen extends HookConsumerWidget {
           icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black),
           onPressed: () {
             if (context.canPop()) {
-              context.pop(); // Si estaba navegando normal, solo regresa
+              context.pop();
             } else {
-              context.go('/trades'); // Si viene de la notificación, lo manda a la lista principal
+              context.go('/trades');
             }
           },
         ),
@@ -409,7 +419,9 @@ class ChatScreen extends HookConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(contactName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDarkMode ? Colors.white : Colors.black)),
-                if (isOnline)
+                if (isTyping)
+                  const Text('escribiendo...', style: TextStyle(fontSize: 13, color: Colors.green, fontWeight: FontWeight.bold))
+                else if (isOnline)
                   const Text('en línea', style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.normal)),
               ],
             ),
@@ -417,8 +429,6 @@ class ChatScreen extends HookConsumerWidget {
         ),
         elevation: 1,
         actions: [
-          // 👇 LOS INDICADORES DE ESTADO EN LA BARRA SUPERIOR
-          // 🔥 Solo mostramos el botón de completar SI eres el dueño del post
           if (!isCompleted && !isCancelled && isPostOwner)
             IconButton(
               icon: const Icon(LucideIcons.checkCircle2, color: Colors.blueAccent),
@@ -664,16 +674,39 @@ class ChatScreen extends HookConsumerWidget {
               child: Text('Enviando...', style: TextStyle(color: Colors.grey, fontSize: 12)),
             ),
 
-          // 👇 OCULTAMOS EL INPUT SI EL TRATO YA SE CERRÓ O CANCELÓ
-          if (isCompleted || isCancelled)
+          // 🔥 LA NUEVA ZONA INFERIOR INTELIGENTE 🔥
+          if (isCancelled)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 16),
               color: isDarkMode ? const Color(0xFF1E2428) : Colors.white,
-              child: Text(
-                isCompleted ? 'Este intercambio ha sido completado. 🎉' : 'Este trato fue cancelado.',
+              child: const Text(
+                'Este trato fue cancelado.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+              ),
+            )
+          else if (isCompleted)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              color: isDarkMode ? const Color(0xFF1E2428) : Colors.white,
+              child: hasReviewed
+                  ? const Text(
+                'Este intercambio ha sido completado. 🎉',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+              )
+                  : ElevatedButton.icon(
+                onPressed: _showRatingModal,
+                icon: const Icon(Icons.star, color: Colors.amber),
+                label: Text('Calificar a $contactName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.blue.shade50,
+                  foregroundColor: isDarkMode ? Colors.white : Colors.blue.shade900,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
               ),
             )
           else

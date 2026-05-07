@@ -6,6 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/widgets/trade_card.dart';
+// 👇 IMPORTAMOS EL RADAR VIP GLOBAL QUE CREAMOS
+import '../../../../core/providers/revenuecat_provider.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../collection/presentation/controllers/collection_controller.dart';
 import '../../../market/data/market_repository.dart';
@@ -71,18 +73,20 @@ class ProfileScreen extends ConsumerWidget {
     final profileState = ref.watch(currentProfileProvider);
     final authState = ref.watch(authControllerProvider);
     final collectionState = ref.watch(myCollectionProvider);
-
     final myPostsState = ref.watch(myHistoryFeedProvider);
+
+    // 📡 LEEMOS EL RADAR DE REVENUECAT
+    final isVip = ref.watch(isVipProvider);
 
     final cardsCount = collectionState.value?.length ?? 0;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.grey,
+      backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.grey.shade100,
       appBar: AppBar(
         title: const Text('Mi Perfil', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
         elevation: 0,
-        backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.grey,
+        backgroundColor: Colors.transparent,
         actions: [
           if (authState.isLoading)
             const Padding(
@@ -149,11 +153,22 @@ class ProfileScreen extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 10, bottom: 30, left: 24, right: 24),
                     child: Column(
                       children: [
+                        // 👑 AVATAR CON BORDE INTELIGENTE (Dorado si es VIP, Azul si no lo es)
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.blueAccent.withOpacity(0.5), width: 3),
+                            gradient: isVip
+                                ? const LinearGradient(
+                              colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                                : null,
+                            border: !isVip ? Border.all(color: Colors.blueAccent.withOpacity(0.5), width: 3) : null,
+                            boxShadow: isVip
+                                ? [BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.4), blurRadius: 15, spreadRadius: 2)]
+                                : [],
                           ),
                           child: CircleAvatar(
                             radius: 50,
@@ -163,8 +178,32 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
 
-                        Text(user.username, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-                        const SizedBox(height: 4),
+                        // 👑 NOMBRE Y CORONA VIP
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(user.username, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                            if (isVip) ...[
+                              const SizedBox(width: 8),
+                              const Icon(LucideIcons.crown, color: Color(0xFFFFD700), size: 28),
+                            ],
+                          ],
+                        ),
+
+                        // 👑 INSIGNIA PRO (Opcional, pero se ve muy premium)
+                        if (isVip)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4, bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD700).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.5)),
+                            ),
+                            child: const Text('COLECCIONISTA PRO', style: TextStyle(color: Color(0xFFFFD700), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                          ),
+
+                        if (!isVip) const SizedBox(height: 4),
                         Text(user.email, style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
                         const SizedBox(height: 20),
 
@@ -258,8 +297,8 @@ class ProfileScreen extends ConsumerWidget {
                                 category: rawData['category'] ?? 'General',
                                 createdAt: DateTime.parse(rawData['created_at']),
                                 status: rawData['status'] ?? 'open',
-                                // 🔥 AHORA LE PASAMOS LOS DATOS DE MONETIZACIÓN AL MODELO
-                                isVip: userMap['is_vip'] ?? false,
+                                // 👑 LE PASAMOS EL ESTADO VIP REAL, NO EL DE SUPABASE
+                                isVip: isVip,
                                 isBoosted: rawData['is_boosted'] ?? false,
                               );
 
@@ -280,7 +319,6 @@ class ProfileScreen extends ConsumerWidget {
                                         if (value == 'delete') {
                                           _confirmDeletePost(context, ref, post.id);
                                         } else if (value == 'boost') {
-                                          // 🔥 LÓGICA DE DESTACAR
                                           if (post.isBoosted) {
                                             ScaffoldMessenger.of(context).showSnackBar(
                                                 const SnackBar(content: Text('¡Esta carta ya está destacada! 🚀'), backgroundColor: Colors.orange)
@@ -293,15 +331,13 @@ class ProfileScreen extends ConsumerWidget {
                                             ScaffoldMessenger.of(context).showSnackBar(
                                                 const SnackBar(content: Text('¡Carta Destacada con éxito! (-50 Gemas)'), backgroundColor: Colors.green)
                                             );
-                                            // Refrescamos para que aparezca el borde dorado inmediatamente
                                             ref.refresh(myHistoryFeedProvider);
                                             ref.refresh(marketFeedProvider);
                                           }
                                         }
                                       },
                                       itemBuilder: (BuildContext context) => [
-                                        // Opción 1: Destacar Carta
-                                        if (!post.isBoosted) // Solo lo mostramos si no está destacada aún
+                                        if (!post.isBoosted)
                                           const PopupMenuItem(
                                             value: 'boost',
                                             child: Row(
@@ -313,7 +349,6 @@ class ProfileScreen extends ConsumerWidget {
                                             ),
                                           ),
 
-                                        // Opción 2: Eliminar
                                         const PopupMenuItem(
                                           value: 'delete',
                                           child: Row(
@@ -328,7 +363,6 @@ class ProfileScreen extends ConsumerWidget {
                                     ),
                                   ),
 
-                                  // 🔥 ETIQUETA 1: COMPLETADO (Verde)
                                   if (isClosed)
                                     Positioned(
                                       top: 26,
@@ -350,7 +384,6 @@ class ProfileScreen extends ConsumerWidget {
                                       ),
                                     ),
 
-                                  // 🔥 ETIQUETA 2: EN PROGRESO (Amarillo/Naranja)
                                   if (isInProgress)
                                     Positioned(
                                       top: 26,

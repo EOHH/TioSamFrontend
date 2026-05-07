@@ -32,10 +32,15 @@ class ProfileRepository {
     }
   }
 
-  // NUEVO 2: Actualizar datos en la tabla Users
-  Future<void> updateProfile({required String username, String? avatarUrl}) async {
+  // 🔥 NUEVO 2: Actualizar datos en la tabla Users (AHORA INCLUYE EL CORREO)
+  Future<void> updateProfile({required String username, String? email, String? avatarUrl}) async {
     final userId = _client.auth.currentUser!.id;
     final updates = <String, dynamic>{'username': username};
+
+    // Si nos envían un correo, lo añadimos al paquete de actualización
+    if (email != null && email.isNotEmpty) {
+      updates['email'] = email;
+    }
 
     if (avatarUrl != null) {
       updates['avatar_url'] = avatarUrl;
