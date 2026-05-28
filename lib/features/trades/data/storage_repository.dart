@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart'; // Para debugPrint
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/providers/supabase_provider.dart';
+// 🔥 IMPORTAMOS NUESTRO MOTOR DE COMPRESIÓN
+import '../../../core/utils/image_compressor.dart';
 
 class StorageRepository {
   final SupabaseClient _client;
@@ -10,11 +12,14 @@ class StorageRepository {
 
   Future<String?> uploadTradeImage(File imageFile) async {
     try {
+      // 🔥 1. APLASTAMOS LA IMAGEN ANTES DE SUBIRLA (Calidad 65% es ideal para cartas)
+      final compressedFile = await ImageCompressor.compressImage(imageFile, quality: 65);
+
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
       final path = 'trades/$fileName';
 
-      // Subir el archivo al bucket 'trade_images'
-      await _client.storage.from('trade_images').upload(path, imageFile);
+      // 🔥 2. SUBIMOS LA IMAGEN COMPRIMIDA en lugar de la original
+      await _client.storage.from('trade_images').upload(path, compressedFile);
 
       // Obtener la URL pública
       final imageUrl = _client.storage.from('trade_images').getPublicUrl(path);

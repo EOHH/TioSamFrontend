@@ -20,6 +20,17 @@ serve(async (req) => {
 
     if (!trade) throw new Error("Publicación no encontrada")
 
+    // 🔥 NUEVO: Insertar en la tabla de notificaciones (Campanita)
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: trade.user_id,
+        title: '¡Nueva Oferta Recibida! 🚀',
+        body: `Alguien acaba de ofrecerte una carta por tu ${trade.offer_item}.`,
+        type: 'new_offer',
+        data: { trade_id: offer.post_id, offer_id: offer.id }
+      });
+
     const { data: owner } = await supabaseAdmin
       .from('users')
       .select('fcm_token')
@@ -27,7 +38,7 @@ serve(async (req) => {
       .single()
 
     if (!owner || !owner.fcm_token) {
-      return new Response(JSON.stringify({ message: 'Usuario sin token FCM' }), { status: 200 })
+      return new Response(JSON.stringify({ message: 'Notificación guardada. Usuario sin token FCM' }), { status: 200 })
     }
 
     // AUTH V1 MAGIA

@@ -6,9 +6,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+// 🔥 IMPORTAMOS TU ONBOARDING
+import '../../features/auth/presentation/screens/onboarding_screen.dart';
+
 import '../../features/collection/domain/models/collection_item.dart';
 import '../../features/collection/presentation/screens/collection_detail_screen.dart';
 import '../../features/collection/presentation/screens/collection_screen.dart';
+import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/trades/presentation/screens/offer_details_screen.dart';
 import '../../features/market/presentation/screens/market_screen.dart';
 import '../../features/profile/domain/models/user_profile.dart';
@@ -33,20 +37,19 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-
-    // 🔥 CAMBIO IMPORTANTE
     initialLocation: '/',
 
     redirect: (context, state) {
       final session = ref.read(authRepositoryProvider).currentSession;
 
+      // 🔥 AÑADIMOS EL ONBOARDING A LAS RUTAS "PÚBLICAS"
       final isAuthRoute =
           state.matchedLocation == '/login' ||
-              state.matchedLocation == '/register';
+              state.matchedLocation == '/register' ||
+              state.matchedLocation == '/onboarding';
 
       final isSplash = state.matchedLocation == '/';
 
-      // 👇 PERMITIR SPLASH SIEMPRE
       if (isSplash) return null;
 
       if (session == null) {
@@ -59,10 +62,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
 
     routes: [
-      // 🔥 SPLASH COMO ENTRY POINT
       GoRoute(
         path: '/',
         builder: (context, state) => const SplashScreen(),
+      ),
+
+      // 🔥 DECLARAMOS LA RUTA DEL ONBOARDING
+      GoRoute(
+          path: '/onboarding',
+          builder: (context, state) => const OnboardingScreen()
       ),
 
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
@@ -72,13 +80,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/chat/:offerId',
         builder: (context, state) {
           final offerId = state.pathParameters['offerId']!;
-          final contactName =
-              state.uri.queryParameters['name'] ?? 'Coleccionista';
-          final contactAvatar =
-              state.uri.queryParameters['avatar'] ??
-                  'https://ui-avatars.com/api/?name=C';
-          final contactId =
-              state.uri.queryParameters['contactId'] ?? '';
+          final contactName = state.uri.queryParameters['name'] ?? 'Coleccionista';
+          final contactAvatar = state.uri.queryParameters['avatar'] ?? 'https://ui-avatars.com/api/?name=C';
+          final contactId = state.uri.queryParameters['contactId'] ?? '';
 
           return ChatScreen(
             offerId: offerId,
@@ -113,51 +117,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+
       // 👇 MAIN APP
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainLayout(navigationShell: navigationShell),
         branches: [
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/market',
-                builder: (context, state) => const MarketScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/trades',
-                builder: (context, state) => const TradesScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/shop',
-                builder: (context, state) => const ShopScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/collection',
-                builder: (context, state) => const CollectionScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/profile',
-                builder: (context, state) => const ProfileScreen(),
-              ),
-            ],
-          ),
+          StatefulShellBranch(routes: [GoRoute(path: '/market', builder: (context, state) => const MarketScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/trades', builder: (context, state) => const TradesScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/shop', builder: (context, state) => const ShopScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/collection', builder: (context, state) => const CollectionScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen())]),
         ],
       ),
     ],

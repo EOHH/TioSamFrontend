@@ -17,6 +17,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // 🔥 NUEVO: Insertar en la tabla de notificaciones (Campanita)
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: offer.offerer_id,
+        title: '¡Trato Aceptado! 🎉',
+        body: `Tu oferta fue aceptada. Toca aquí para ver los detalles.`,
+        type: 'offer_accepted',
+        data: { offer_id: offer.id }
+      });
+
     const { data: offerer } = await supabaseAdmin
       .from('users')
       .select('fcm_token')
@@ -24,7 +35,7 @@ serve(async (req) => {
       .single()
 
     if (!offerer || !offerer.fcm_token) {
-      return new Response(JSON.stringify({ message: 'Usuario sin token FCM' }), { status: 200 })
+      return new Response(JSON.stringify({ message: 'Notificación guardada. Usuario sin token FCM' }), { status: 200 })
     }
 
     // AUTH V1 MAGIA

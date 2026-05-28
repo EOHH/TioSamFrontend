@@ -3,14 +3,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart'; // 🔥 IMPORTAMOS SHARE PLUS
 
-// 👇 1. IMPORTAMOS TU REPOSITORIO (El Cerebro)
 import '../../data/offer_repository.dart';
-
-// Importamos el controlador del Home y Mercado para refrescarlos
 import '../../../profile/presentation/controllers/my_posts_controller.dart';
 import '../../../market/data/market_repository.dart';
-import 'trades_screen.dart';
 
 // 1. EL PROVEEDOR DE DATOS
 final offerDetailsProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, tradeId) async {
@@ -39,10 +36,8 @@ class OfferDetailsScreen extends ConsumerWidget {
 
   const OfferDetailsScreen({super.key, required this.tradeId});
 
-  // 👇 LA LÓGICA DE NEGOCIO DELEGADA AL REPOSITORIO
   Future<void> _responderOferta(BuildContext context, WidgetRef ref, String offerId, String status) async {
     try {
-      // 1. Modal de carga
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -51,19 +46,14 @@ class OfferDetailsScreen extends ConsumerWidget {
 
       final offerRepo = ref.read(offerRepositoryProvider);
 
-      // 2. Lógica de negocio (La Máquina de Estados)
       if (status == 'accepted') {
-        // 🔥 Llamamos al Efecto Dominó: Acepta esta, rechaza el resto y cierra la carta
         await offerRepo.acceptOffer(offerId);
       } else {
-        // Solo actualizamos el estado (ej. 'rejected')
         await offerRepo.updateOfferStatus(offerId, status);
       }
 
-      // 3. Quitamos el loading
       if (context.mounted) Navigator.pop(context);
 
-      // 4. Refrescamos caché y Redirigimos
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -72,17 +62,13 @@ class OfferDetailsScreen extends ConsumerWidget {
           ),
         );
 
-        // 🔥 Refrescamos la lista de tus publicaciones (para que la carta salga cerrada)
-        // Nota: Asegúrate de usar el nombre exacto de tus providers de Riverpod aquí
         try { ref.invalidate(marketFeedProvider); } catch (_) {}
-
-        // 🔥 REDIRECCIÓN a tu pantalla principal de trades
         context.go('/trades');
       }
 
     } catch (e) {
       if (context.mounted) {
-        Navigator.pop(context); // Quitamos loading si hay error
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red)
         );
@@ -95,7 +81,29 @@ class OfferDetailsScreen extends ConsumerWidget {
     final offerState = ref.watch(offerDetailsProvider(tradeId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Detalles del Trato', style: TextStyle(fontWeight: FontWeight.bold)), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Detalles del Trato', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        actions: [
+          // 🔥 EL BOTÓN VIRAL: COMPARTIR ENLACE
+          IconButton(
+            icon: const Icon(Icons.share_rounded, color: Colors.blueAccent),
+            tooltip: 'Compartir Oferta',
+            onPressed: () {
+              // Creamos el enlace que GoRouter interceptará.
+              // (Cambia "tiosam.com" por el dominio que decidas comprar en el futuro)
+              final String deepLink = 'https://tiosam.com/offer/$tradeId';
+
+              final String mensaje = '¡Mira esta carta increíble que encontré en TioSam! 🃏✨\n\n'
+                  'Toca el enlace para verla en la app y hacer un trato:\n'
+                  '$deepLink';
+
+              Share.share(mensaje);
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: offerState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => _buildErrorState(context, error.toString()),
@@ -161,9 +169,9 @@ class OfferDetailsScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.withOpacity(0.2))
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.2))
             ),
             child: Text('"$mensaje"', style: const TextStyle(fontStyle: FontStyle.italic)),
           ),
@@ -202,7 +210,7 @@ class OfferDetailsScreen extends ConsumerWidget {
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(color: badgeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: badgeColor.withOpacity(0.5))),
+          decoration: BoxDecoration(color: badgeColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: badgeColor.withValues(alpha: 0.5))),
           child: Text(itemName, style: TextStyle(fontWeight: FontWeight.bold, color: badgeColor)),
         ),
       ],

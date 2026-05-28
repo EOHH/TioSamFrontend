@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+// 🔥 IMPORTAMOS SHARED PREFERENCES
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ─────────────────────────────────────────────
 //  TioSam · Splash Screen  (Senior-grade)
@@ -76,12 +78,6 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     // ─── Intervalos de la secuencia ───────────
-    //  0.00–0.50 → logo fade + scale  (elastic)
-    //  0.35–0.65 → título sube
-    //  0.55–0.80 → título fade + shimmer
-    //  0.65–0.85 → divider aparece
-    //  0.75–1.00 → subtítulo + bottom bar
-
     _logoFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _mainCtrl,
@@ -138,10 +134,28 @@ class _SplashScreenState extends State<SplashScreen>
     // ── Arrancar secuencia principal ──────────
     _mainCtrl.forward();
 
-    // ── Navegar tras 3 segundos ───────────────
-    Timer(const Duration(milliseconds: 3200), () {
-      if (mounted) context.go('/market');
-    });
+    // 🔥 LA MAGIA DEL ONBOARDING OCURRE AQUÍ 🔥
+    Timer(const Duration(milliseconds: 3200), _checkOnboardingStatus);
+  }
+
+  // 👇 NUEVA FUNCIÓN: El cerebro que decide a dónde enviar al usuario
+  Future<void> _checkOnboardingStatus() async {
+    if (!mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    // Si 'hasSeenOnboarding' no existe, devuelve false (es usuario nuevo)
+    final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+
+    if (mounted) {
+      if (!hasSeenOnboarding) {
+        // Es nuevo -> Al Onboarding
+        context.go('/onboarding');
+      } else {
+        // Ya lo vio -> Al flujo normal (Market)
+        // Nota: El app_router se encargará automáticamente de mandarlo a /login si no tiene sesión activa
+        context.go('/market');
+      }
+    }
   }
 
   @override

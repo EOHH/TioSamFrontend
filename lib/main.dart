@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'core/providers/revenuecat_provider.dart';
-import 'firebase_options.dart';
-
 import 'package:purchases_flutter/purchases_flutter.dart';
+// 🔥 IMPORTAMOS TIMEAGO Y EL IDIOMA ESPAÑOL AQUÍ
+import 'package:timeago/timeago.dart' as timeago;
 
+import 'core/providers/revenuecat_provider.dart';
+import 'core/services/notification_service.dart';
+import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 
-// 👇 EL VIGILANTE NOCTURNO: Función "Zombie" para Firebase
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -24,7 +27,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
 
-  // INICIALIZACIÓN SECUENCIAL SEGURA
+  // 🔥 ACTIVAMOS EL ESPAÑOL PARA LAS FECHAS AL ARRANCAR LA APP
+  timeago.setLocaleMessages('es', timeago.EsMessages());
+
+  // INICIALIZACIÓN SECUENCIAL SECURA
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -40,14 +46,22 @@ Future<void> main() async {
   runApp(const ProviderScope(child: AnimeTradeApp()));
 }
 
-class AnimeTradeApp extends ConsumerWidget {
+class AnimeTradeApp extends HookConsumerWidget {
   const AnimeTradeApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-
     ref.watch(isVipProvider);
     final router = ref.watch(routerProvider);
+
+    useEffect(() {
+      final notifService = NotificationService();
+      notifService.initNotifications();
+      notifService.setupInteractedMessage((routePath) {
+        router.push(routePath);
+      });
+      return null;
+    }, []);
 
     return MaterialApp.router(
       title: 'TioSam Marketplace',

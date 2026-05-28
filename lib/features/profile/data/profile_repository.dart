@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/providers/supabase_provider.dart';
 import '../domain/models/user_profile.dart';
+import '../../../core/utils/image_compressor.dart';
 
 class ProfileRepository {
   final SupabaseClient _client;
@@ -21,11 +22,16 @@ class ProfileRepository {
   Future<String?> uploadAvatar(File imageFile) async {
     try {
       final userId = _client.auth.currentUser!.id;
-      final extension = imageFile.path.split('.').last;
-      final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.$extension';
-      final path = '$userId/$fileName'; // Guarda en una subcarpeta con el ID del usuario
 
-      await _client.storage.from('avatars').upload(path, imageFile);
+      // 🔥 LA MAGIA OCURRE AQUÍ: Aplastamos la imagen antes de subirla
+      final compressedFile = await ImageCompressor.compressImage(imageFile, quality: 60);
+
+      // Le forzamos la extensión .jpg porque nuestro compresor la convierte a ese formato
+      final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = '$userId/$fileName';
+
+      // Subimos el archivo comprimido en vez del original
+      await _client.storage.from('avatars').upload(path, compressedFile);
       return _client.storage.from('avatars').getPublicUrl(path);
     } catch (e) {
       return null;

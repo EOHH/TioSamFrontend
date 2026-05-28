@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../auth/data/auth_repository.dart';
+import '../../../notifications/data/notification_repository.dart';
 import '../../../trades/presentation/widgets/make_offer_modal.dart';
 import '../../data/market_repository.dart';
 import '../../../../core/widgets/trade_card.dart';
@@ -15,7 +17,7 @@ class MarketScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final marketState = ref.watch(marketFeedProvider);
-    final marketNotifier = ref.read(marketFeedProvider.notifier); // Para acceder a los métodos de paginación
+    final marketNotifier = ref.read(marketFeedProvider.notifier);
     final categoriesState = ref.watch(categoriesProvider);
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -25,15 +27,12 @@ class MarketScreen extends HookConsumerWidget {
     final searchQuery = useState('');
     final selectedCategory = useState('Todas');
 
-    // 🔥 CONTROLADOR DE SCROLL
     final scrollController = useScrollController();
 
-    // 📡 LA ANTENA DEL SCROLL INFINITO
     useEffect(() {
       void listener() {
-        // Si el usuario bajó y está a menos de 200px del final de la lista...
         if (scrollController.position.pixels >= scrollController.position.maxScrollExtent - 200) {
-          marketNotifier.fetchMore(); // ...trae las siguientes 15 cartas
+          marketNotifier.fetchMore();
         }
       }
       scrollController.addListener(listener);
@@ -52,6 +51,24 @@ class MarketScreen extends HookConsumerWidget {
         title: const Text('Mercado de Intercambio', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: -0.5)),
         elevation: 0,
         backgroundColor: Colors.transparent,
+        actions: [
+          // 🔥 LA CAMPANITA MÁGICA
+          Consumer(
+            builder: (context, ref, child) {
+              final notifsAsync = ref.watch(notificationsStreamProvider);
+              final hasUnread = notifsAsync.value?.any((n) => !n.isRead) ?? false;
+
+              return IconButton(
+                icon: Badge(
+                  isLabelVisible: hasUnread,
+                  child: const Icon(LucideIcons.bell),
+                ),
+                onPressed: () => context.push('/notifications'),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
@@ -117,7 +134,6 @@ class MarketScreen extends HookConsumerWidget {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                // Al arrastrar hacia arriba, reiniciamos la paginación desde cero
                 await marketNotifier.fetchInitial();
                 ref.invalidate(categoriesProvider);
               },
@@ -155,16 +171,14 @@ class MarketScreen extends HookConsumerWidget {
                     );
                   }
 
-                  // 🔥 AÑADIMOS +1 AL COUNT SI AÚN HAY MÁS PARA MOSTRAR EL SPINNER AL FONDO
                   final itemCount = filteredTrades.length + (marketNotifier.hasReachedMax ? 0 : 1);
 
                   return ListView.builder(
-                    controller: scrollController, // 👈 Se inyecta aquí
-                    physics: const AlwaysScrollableScrollPhysics(), // Importante para que el RefreshIndicator funcione siempre
+                    controller: scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.only(top: 8, bottom: 40),
                     itemCount: itemCount,
                     itemBuilder: (context, index) {
-                      // 🔄 Si llegamos al último item falso, mostramos el spinner
                       if (index == filteredTrades.length) {
                         return const Padding(
                           padding: EdgeInsets.symmetric(vertical: 32.0),

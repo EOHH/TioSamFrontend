@@ -11,6 +11,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:image_cropper/image_cropper.dart';
 
+import '../../../../core/services/store_review_service.dart';
+import '../../../../core/utils/image_compressor.dart';
 import '../../../trades/data/offer_repository.dart';
 import '../../data/chat_repository.dart';
 import '../controllers/chat_controller.dart';
@@ -231,6 +233,7 @@ class ChatScreen extends HookConsumerWidget {
                           if (hookContext.mounted) {
                             Navigator.pop(hookContext);
                             ScaffoldMessenger.of(hookContext).showSnackBar(const SnackBar(content: Text('¡Gracias por tu reseña! ⭐'), backgroundColor: Colors.green));
+                            StoreReviewService.askForReviewIfNeeded();
                           }
                         } catch (e) {
                           if (hookContext.mounted) {
@@ -348,7 +351,15 @@ class ChatScreen extends HookConsumerWidget {
 
           if (croppedFile != null) {
             isUploading.value = true;
-            await chatAction.sendMessage(offerId: offerId, imageFile: File(croppedFile.path));
+
+            // 🔥 1. Convertimos el archivo recortado a un File normal
+            final fileToUpload = File(croppedFile.path);
+
+            // 🔥 2. LO PASAMOS POR LA COMPRESORA (Aplastamos el peso, mantenemos la calidad)
+            final compressedFile = await ImageCompressor.compressImage(fileToUpload, quality: 65);
+
+            // 🔥 3. Enviamos el archivo ya comprimido
+            await chatAction.sendMessage(offerId: offerId, imageFile: compressedFile);
           }
         }
       } catch (e) {

@@ -41,18 +41,6 @@ serve(async (req) => {
       ? tradeData.user_id
       : offerData.offerer_id;
 
-    // 4. Buscar el FCM Token del receptor
-    const { data: userData, error: userError } = await supabaseClient
-      .from('users')
-      .select('fcm_token')
-      .eq('id', receiverId)
-      .single()
-
-    if (userError || !userData || !userData.fcm_token) {
-      console.log(`El usuario receptor (${receiverId}) no tiene FCM Token instalado.`);
-      return new Response(JSON.stringify({ message: "Usuario sin token FCM" }), { status: 200 });
-    }
-
     // 5. Buscar el nombre y avatar de quien envía (El Sender)
     const { data: senderData } = await supabaseClient
       .from('users')
@@ -66,6 +54,34 @@ serve(async (req) => {
     let messageBody = record.message;
     if (!messageBody && record.image_url) messageBody = "📷 Te envió una foto";
     if (!messageBody && record.audio_url) messageBody = "🎤 Te envió una nota de voz";
+
+    // 🔥 NUEVO: Insertar en la tabla de notificaciones (Campanita)
+    await supabaseClient
+      .from('notifications')
+      .insert({
+        user_id: receiverId,
+        title: `Nuevo mensaje de ${senderName}`,
+        body: messageBody,
+        type: 'new_chat_message',
+        data: {
+          offer_id: record.offer_id,
+          contact_id: record.sender_id,
+          contact_name: senderName,
+          contact_avatar: senderAvatar
+        }
+      });
+
+    // 4. Buscar el FCM Token del receptor
+    const { data: userData, error: userError } = await supabaseClient
+      .from('users')
+      .select('fcm_token')
+      .eq('id', receiverId)
+      .single()
+
+    if (userError || !userData || !userData.fcm_token) {
+      console.log(`El usuario receptor (${receiverId}) no tiene FCM Token instalado.`);
+      return new Response(JSON.stringify({ message: "Notificación guardada. Usuario sin token FCM" }), { status: 200 });
+    }
 
     // 6. OBTENER TOKEN DE GOOGLE (MAGIA V1)
     const serviceAccountStr = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
@@ -99,7 +115,6 @@ serve(async (req) => {
         },
         data: {
           type: "new_chat_message",
-          // 👇 Usamos String() para que Firebase no elimine los datos en el viaje
           offer_id: String(record.offer_id),
           contact_id: String(record.sender_id),
           contact_name: String(senderName),
