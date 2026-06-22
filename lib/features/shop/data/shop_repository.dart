@@ -35,20 +35,12 @@ class ShopRepository {
   }
 
   // --- 3. PROCESAR PAGO REAL DE GEMAS (RevenueCat) ---
-  // 💡 Nota Senior: Por ahora hacemos la recarga de gemas aquí en el cliente.
-  // Para máxima seguridad en producción a gran escala, esto se debe hacer con "Webhooks"
-  // de RevenueCat avisándole a Supabase de forma secreta en el backend.
-  Future<UserWallet> buyGemsWithRealMoney(Package package, int gemsReward) async {
+  // 🔒 SEGURIDAD: Actualización manual eliminada. Delegado a Webhook de RevenueCat por seguridad.
+  // Ahora el cliente solo procesa el pago. El servidor asignará las gemas de forma segura.
+  Future<void> buyGemsWithRealMoney(Package package) async {
     try {
       await Purchases.purchasePackage(package); // RevenueCat valida con Google/Apple
-
-      final userId = _supabase.auth.currentUser!.id;
-      final currentWallet = await getMyWallet();
-      final newBalance = (currentWallet?.gems ?? 0) + gemsReward;
-
-      final response = await _supabase.from('user_wallets').update({'gems': newBalance}).eq('user_id', userId).select().single();
-      return UserWallet.fromJson(response);
-
+      // La compra fue exitosa. No actualizamos Supabase desde aquí.
     } on PlatformException catch (e) {
       var errorCode = PurchasesErrorHelper.getErrorCode(e);
       if (errorCode != PurchasesErrorCode.purchaseCancelledError) {

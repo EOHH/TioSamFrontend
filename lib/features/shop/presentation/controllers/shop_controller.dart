@@ -26,8 +26,9 @@ class ShopController extends StateNotifier<AsyncValue<UserWallet?>> {
   Future<bool> buyRealGemsPack(Package package, int gemsReward) async {
     state = const AsyncLoading();
     try {
-      final updatedWallet = await _repository.buyGemsWithRealMoney(package, gemsReward);
-      state = AsyncData(updatedWallet);
+      await _repository.buyGemsWithRealMoney(package);
+      // Recargamos el estado (aunque el webhook puede tardar unos segundos)
+      await loadWallet();
       return true;
     } catch (e, st) {
       state = AsyncError(e, st);

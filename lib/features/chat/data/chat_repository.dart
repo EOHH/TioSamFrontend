@@ -64,14 +64,23 @@ class ChatRepository {
     try {
       // 1. Si el mensaje tiene una imagen, la borramos del Bucket primero
       if (imageUrl != null) {
-        // Extraemos la ruta exacta del archivo desde la URL completa
-        // Ejemplo: cortamos "https://.../chat_media/123/img.jpg" para obtener "123/img.jpg"
-        final path = imageUrl.split('/public/chat_media/').last;
-        await _client.storage.from('chat_media').remove([path]);
+        // Extraemos la ruta exacta del archivo de forma robusta usando Uri
+        final uri = Uri.parse(imageUrl);
+        final segments = uri.pathSegments;
+        final bucketIndex = segments.indexOf('chat_media');
+        
+        if (bucketIndex != -1 && bucketIndex < segments.length - 1) {
+          final path = segments.sublist(bucketIndex + 1).join('/');
+          await _client.storage.from('chat_media').remove([path]);
+        }
       }
 
-      // 2. Borramos el registro de la tabla chat_messages
-      await _client.from('chat_messages').delete().eq('id', messageId);
+      // 2. Borramos el registro de la tabla chat_messages con filtro de seguridad
+      await _client
+          .from('chat_messages')
+          .delete()
+          .eq('id', messageId)
+          .eq('sender_id', currentUserId); // Filtro obligatorio para AppSec
 
     } catch (e) {
       throw Exception('Error al eliminar el mensaje: $e');

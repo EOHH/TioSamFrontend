@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'core/config/env.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,7 +25,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+
 
   // 🔥 ACTIVAMOS EL ESPAÑOL PARA LAS FECHAS AL ARRANCAR LA APP
   timeago.setLocaleMessages('es', timeago.EsMessages());
@@ -35,12 +35,12 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL']!,
-    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    url: Env.supabaseUrl,
+    anonKey: Env.supabaseAnonKey,
   );
 
   await Purchases.setLogLevel(LogLevel.debug);
-  PurchasesConfiguration configuration = PurchasesConfiguration("goog_uWJFeYTFeTBwYySobsHHTdTuHEV");
+  PurchasesConfiguration configuration = PurchasesConfiguration(Env.revenueCatKey);
   await Purchases.configure(configuration);
 
   runApp(const ProviderScope(child: AnimeTradeApp()));

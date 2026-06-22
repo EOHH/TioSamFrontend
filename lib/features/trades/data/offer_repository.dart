@@ -96,16 +96,23 @@ class OfferRepository {
 
   // --- ACTUALIZACIÓN MANUAL (Opcional, si la usas en otro lado) ---
   Future<void> updateOfferStatus(String offerId, String newStatus) async {
+    final currentUserId = _client.auth.currentUser!.id;
     await _client
         .from('trade_offers')
         .update({'status': newStatus})
-        .eq('id', offerId);
+        .eq('id', offerId)
+        .eq('offerer_id', currentUserId); // Filtro de seguridad AppSec
   }
 
   // --- ELIMINAR OFERTA ---
   Future<void> deleteOffer(String offerId) async {
     try {
-      await _client.from('trade_offers').delete().eq('id', offerId);
+      final currentUserId = _client.auth.currentUser!.id;
+      await _client
+          .from('trade_offers')
+          .delete()
+          .eq('id', offerId)
+          .eq('offerer_id', currentUserId); // Filtro de seguridad AppSec
     } catch (e) {
       throw Exception('Error al eliminar la oferta: $e');
     }

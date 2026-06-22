@@ -38,20 +38,28 @@ class ProfileRepository {
     }
   }
 
-  // 🔥 NUEVO 2: Actualizar datos en la tabla Users (AHORA INCLUYE EL CORREO)
+  // 🔥 NUEVO 2: Actualizar datos en la tabla Users
   Future<void> updateProfile({required String username, String? email, String? avatarUrl}) async {
     final userId = _client.auth.currentUser!.id;
-    final updates = <String, dynamic>{'username': username};
-
-    // Si nos envían un correo, lo añadimos al paquete de actualización
+    
+    // Si el usuario proporcionó un correo, actualizar de forma segura mediante Supabase Auth
     if (email != null && email.isNotEmpty) {
-      updates['email'] = email;
+      try {
+        await _client.auth.updateUser(UserAttributes(email: email));
+      } on AuthException catch (e) {
+        print('AuthException al actualizar el correo: ${e.message}');
+      } catch (e) {
+        print('Error inesperado al actualizar el correo: $e');
+      }
     }
+
+    final updates = <String, dynamic>{'username': username};
 
     if (avatarUrl != null) {
       updates['avatar_url'] = avatarUrl;
     }
 
+    // Se actualizan los demás campos en la tabla pública users sin el email
     await _client.from('users').update(updates).eq('id', userId);
   }
 }
