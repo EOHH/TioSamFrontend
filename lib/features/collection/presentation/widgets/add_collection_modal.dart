@@ -72,9 +72,23 @@ class AddCollectionModal extends HookConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            CustomInput(controller: nameController, label: "Nombre de la carta (Ej: Pikachu VMAX)", icon: LucideIcons.creditCard),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: "Nombre de la carta (Ej: Pikachu VMAX)",
+                prefixIcon: const Icon(LucideIcons.creditCard),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+            ),
             const SizedBox(height: 15),
-            CustomInput(controller: descController, label: "Historia o detalles (Opcional)", icon: LucideIcons.text),
+            TextField(
+              controller: descController,
+              decoration: InputDecoration(
+                labelText: "Historia o detalles (Opcional)",
+                prefixIcon: const Icon(LucideIcons.text),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+            ),
             const SizedBox(height: 30),
 
             SizedBox(

@@ -231,10 +231,28 @@ class CreateTradeModal extends HookConsumerWidget {
             ),
             const SizedBox(height: 24),
 
-            // 🔥 CAMPOS CON DISEÑO RESTAURADO
-            CustomInput(controller: offerController, label: "¿Qué ofreces? (Ej: Pikachu Holográfico)", icon: LucideIcons.gift),
+            // 🔥 CAMPOS CON DISEÑO RESTAURADO Y VISIBLES EN TEMA CLARO Y OSCURO
+            TextField(
+              controller: offerController,
+              decoration: InputDecoration(
+                labelText: '¿Qué ofreces? (Ej: Pikachu Holográfico)',
+                prefixIcon: const Icon(LucideIcons.gift, size: 20, color: Colors.blueAccent),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              ),
+            ),
             const SizedBox(height: 16),
-            CustomInput(controller: requestController, label: "¿Qué buscas? (Ej: Charizard 1ra Edición)", icon: LucideIcons.search),
+            TextField(
+              controller: requestController,
+              decoration: InputDecoration(
+                labelText: '¿Qué buscas? (Ej: Charizard 1ra Edición)',
+                prefixIcon: const Icon(LucideIcons.search, size: 20, color: Colors.blueAccent),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              ),
+            ),
             const SizedBox(height: 16),
 
             categoriesState.when(

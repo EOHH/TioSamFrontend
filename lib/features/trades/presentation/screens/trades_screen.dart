@@ -5,8 +5,11 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../data/offer_repository.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../../core/widgets/trade_card.dart';
+import '../../../shop/presentation/controllers/shop_controller.dart';
 
 // 🔥 VIGILANTE DE SESIÓN
 final authStateProvider = StreamProvider.autoDispose((ref) {
@@ -61,6 +64,14 @@ final sentOffersProvider = FutureProvider.autoDispose((ref) async {
   return ref.watch(offerRepositoryProvider).getSentOffers();
 });
 
+bool _isRareItem(String name) {
+  final lower = name.toLowerCase();
+  return lower.contains('(lr)') || 
+         lower.contains('(legendary)') || 
+         lower.contains('(ur)') || 
+         lower.contains('(ssr)') ||
+         lower.contains('(sr)');
+}
 
 class TradesScreen extends HookConsumerWidget {
   const TradesScreen({super.key});
@@ -86,22 +97,115 @@ class TradesScreen extends HookConsumerWidget {
     final receivedState = ref.watch(receivedOffersProvider);
     final sentState = ref.watch(sentOffersProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final walletState = ref.watch(shopControllerProvider);
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF121212) : Colors.grey,
-        appBar: AppBar(
-          title: const Text('Intercambios', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-          elevation: 0,
-          backgroundColor: isDark ? const Color(0xFF121212) : Colors.grey,
-          bottom: TabBar(
-            indicatorColor: Colors.blueAccent,
-            indicatorWeight: 3,
-            labelColor: Colors.blueAccent,
-            unselectedLabelColor: Colors.grey,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-            tabs: const [Tab(text: 'Recibidos'), Tab(text: 'Enviados')],
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F8FF),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(190),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF7C4DFF), Color(0xFF00C2FF)],
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10, left: 16, right: 16, bottom: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left side: back button + title + subtitle
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                if (context.canPop()) {
+                                  context.pop();
+                                } else {
+                                  context.go('/');
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                                child: const Icon(LucideIcons.arrowLeft, color: Colors.white, size: 20),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Intercambios',
+                              style: GoogleFonts.poppins(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                            ),
+                            Text(
+                              'Gestiona tus intercambios',
+                              style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                        
+                        // Right side: Gems
+                        walletState.when(
+                          data: (wallet) {
+                            final gems = wallet?.gems ?? 0;
+                            return GestureDetector(
+                              onTap: () => context.push('/shop'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(LucideIcons.gem, color: Color(0xFF00C2FF), size: 16),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      gems.toString(),
+                                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                      child: const Icon(LucideIcons.plus, color: Color(0xFF7C4DFF), size: 12),
+                                    )
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          loading: () => const SizedBox(),
+                          error: (_, __) => const SizedBox(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  TabBar(
+                    indicatorColor: Colors.white,
+                    indicatorWeight: 4,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white.withOpacity(0.5),
+                    labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14),
+                    tabs: const [Tab(text: 'Recibidos'), Tab(text: 'Enviados')],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         body: TabBarView(
@@ -115,9 +219,17 @@ class TradesScreen extends HookConsumerWidget {
                   onRefresh: () async => ref.invalidate(receivedOffersProvider),
                   child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+                    padding: const EdgeInsets.only(top: 16, bottom: 100, left: 16, right: 16),
                     itemCount: offers.length,
-                    itemBuilder: (context, index) => _OfferTile(offer: offers[index], isReceived: true),
+                    itemBuilder: (context, index) {
+                      return Column(
+                        children: [
+                          _OfferTile(offer: offers[index], isReceived: true),
+                          if (index == offers.length - 1)
+                            _buildSecurityBanner(),
+                        ],
+                      );
+                    },
                   ),
                 );
               },
@@ -134,9 +246,17 @@ class TradesScreen extends HookConsumerWidget {
                   onRefresh: () async => ref.invalidate(sentOffersProvider),
                   child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(top: 16, bottom: 80, left: 16, right: 16),
+                    padding: const EdgeInsets.only(top: 16, bottom: 100, left: 16, right: 16),
                     itemCount: offers.length,
-                    itemBuilder: (context, index) => _OfferTile(offer: offers[index], isReceived: false),
+                    itemBuilder: (context, index) {
+                      return Column(
+                        children: [
+                          _OfferTile(offer: offers[index], isReceived: false),
+                          if (index == offers.length - 1)
+                            _buildSecurityBanner(),
+                        ],
+                      );
+                    },
                   ),
                 );
               },
@@ -156,7 +276,51 @@ class TradesScreen extends HookConsumerWidget {
         children: [
           Icon(icon, size: 64, color: Colors.grey.withOpacity(0.3)),
           const SizedBox(height: 16),
-          Text(message, style: const TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w500)),
+          Text(message, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecurityBanner() {
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF0F5), // Soft pink/purple bg
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFFB6C1).withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFFFF9A9E), Color(0xFFFECFEF)]),
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: const Color(0xFFFF9A9E).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: const Icon(LucideIcons.lock, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Intercambio 100% Seguro',
+                  style: GoogleFonts.poppins(color: const Color(0xFF9D4EDD), fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Nuestro sistema protege tus cartas y garantiza un intercambio justo.',
+                  style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(LucideIcons.shieldCheck, color: Color(0xFF9D4EDD), size: 32),
         ],
       ),
     );
@@ -175,10 +339,10 @@ class _OfferTile extends ConsumerWidget {
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Row(children: [Icon(LucideIcons.trash2, color: Colors.red), SizedBox(width: 10), Text('¿Eliminar oferta?')]),
-        content: const Text('Esta acción eliminará la oferta de tu lista permanentemente. ¿Estás seguro?'),
+        title: Row(children: [const Icon(LucideIcons.trash2, color: Colors.red), const SizedBox(width: 10), Text('¿Eliminar oferta?', style: GoogleFonts.poppins())]),
+        content: Text('Esta acción eliminará la oferta de tu lista permanentemente. ¿Estás seguro?', style: GoogleFonts.poppins()),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar', style: TextStyle(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('Cancelar', style: GoogleFonts.poppins(color: Colors.grey))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             onPressed: () async {
@@ -192,7 +356,7 @@ class _OfferTile extends ConsumerWidget {
                 if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
               }
             },
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text('Eliminar', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -206,7 +370,6 @@ class _OfferTile extends ConsumerWidget {
     } else {
       await repo.updateOfferStatus(offer.id, status);
     }
-    // Forzamos actualización local inmediata
     ref.invalidate(receivedOffersProvider);
     ref.invalidate(sentOffersProvider);
   }
@@ -214,16 +377,26 @@ class _OfferTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final String myItemName = offer.post?.offerItemName ?? 'Carta';
+    final String theirItemName = offer.post?.requestItemName ?? 'Carta';
+
+    final String leftCardName = isReceived ? theirItemName : myItemName;
+    final String rightCardName = isReceived ? myItemName : theirItemName;
+    
+    // Asumimos que la imagen original del post es la de "myItemName" en ambos casos.
+    // the other one we don't have the image in the current db structure usually.
+    final String? leftCardImg = isReceived ? null : offer.post?.offerItemImage;
+    final String? rightCardImg = isReceived ? offer.post?.offerItemImage : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.05), blurRadius: 10, offset: const Offset(0, 4))
+          BoxShadow(color: const Color(0xFF7C4DFF).withOpacity(isDark ? 0.2 : 0.05), blurRadius: 15, offset: const Offset(0, 8))
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -250,26 +423,26 @@ class _OfferTile extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(offer.offererUsername ?? 'Coleccionista', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.3)),
-                      const SizedBox(height: 2),
                       Row(
                         children: [
-                          Icon(isReceived ? LucideIcons.arrowDownLeft : LucideIcons.arrowUpRight, size: 14, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              isReceived ? 'Quiere tu: ${offer.post?.offerItemName ?? 'Carta'}' : 'Tú quieres su: ${offer.post?.offerItemName ?? 'Carta'}',
-                              style: const TextStyle(fontSize: 13, color: Colors.grey),
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
-                            ),
+                          Flexible(
+                            child: Text(offer.offererUsername ?? 'Coleccionista', overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.3)),
                           ),
+                          const SizedBox(width: 4),
+                          const Icon(LucideIcons.checkCircle2, color: Color(0xFF7C4DFF), size: 14),
                         ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isReceived ? 'Quiere tu: $myItemName' : 'Tú quieres su: $theirItemName',
+                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 _StatusBadge(status: offer.status),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
 
                 // Menú 3 puntitos
                 SizedBox(
@@ -281,9 +454,9 @@ class _OfferTile extends ConsumerWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     onSelected: (value) { if (value == 'delete') _confirmDelete(context, ref); },
                     itemBuilder: (BuildContext context) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete',
-                        child: Row(children: [Icon(LucideIcons.trash2, color: Colors.redAccent, size: 20), SizedBox(width: 10), Text('Eliminar', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold))]),
+                        child: Row(children: [const Icon(LucideIcons.trash2, color: Colors.redAccent, size: 20), const SizedBox(width: 10), Text('Eliminar', style: GoogleFonts.poppins(color: Colors.redAccent, fontWeight: FontWeight.bold))]),
                       ),
                     ],
                   ),
@@ -296,31 +469,66 @@ class _OfferTile extends ConsumerWidget {
               const SizedBox(height: 16),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  // 🔥 CORRECCIÓN DEL COLOR AQUÍ
-                  color: isDark ? Colors.grey?.withOpacity(0.4) : Colors.grey,
-                  borderRadius: const BorderRadius.only(topRight: Radius.circular(16), bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
-                  border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                  color: isDark ? Colors.white10 : const Color(0xFFF6F8FF),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text('"${offer.message}"', style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic, height: 1.4)),
+                child: Text('"${offer.message}"', style: GoogleFonts.poppins(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey.shade600)),
               ),
             ],
 
-            // --- ACCIONES ---
+            // --- CARTAS HOLOGRÁFICAS ---
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: HolographicItemNode(
+                    name: leftCardName,
+                    img: leftCardImg,
+                    isOffer: isReceived ? false : true,
+                    isRare: _isRareItem(leftCardName),
+                    topLabel: isReceived ? 'EL OFRECE' : 'TÚ OFRECES',
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white10 : Colors.grey.shade100,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2))],
+                    ),
+                    child: Icon(LucideIcons.repeat, size: 20, color: isDark ? Colors.white60 : Colors.black54),
+                  ),
+                ),
+                Expanded(
+                  child: HolographicItemNode(
+                    name: rightCardName,
+                    img: rightCardImg,
+                    isOffer: isReceived ? true : false,
+                    isRare: _isRareItem(rightCardName),
+                    topLabel: isReceived ? 'TÚ OFRECES' : 'ÉL OFRECE',
+                  ),
+                ),
+              ],
+            ),
+
+            // --- ACCIONES (BOTONES) ---
+            const SizedBox(height: 20),
             if (isReceived && offer.status == 'pending') ...[
-              const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => _update(ref, 'rejected'),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         side: const BorderSide(color: Colors.redAccent),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text('Rechazar', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      child: Text('Rechazar', style: GoogleFonts.poppins(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -328,43 +536,65 @@ class _OfferTile extends ConsumerWidget {
                     child: ElevatedButton(
                       onPressed: () => _update(ref, 'accepted'),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: const Color(0xFF00C2FF),
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text('Aceptar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: Text('Aceptar', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
               )
-            ],
-
-            if (offer.status == 'accepted' || offer.status == 'completed') ...[
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    final currentUserId = Supabase.instance.client.auth.currentUser!.id;
-                    final isMeOfferer = offer.offererId == currentUserId;
-                    final contactName = isMeOfferer ? offer.post?.username : offer.offererUsername;
-                    final contactAvatar = isMeOfferer ? offer.post?.userAvatar : offer.offererAvatar;
-                    final contactId = isMeOfferer ? offer.post?.userId : offer.offererId;
-
-                    context.push('/chat/${offer.id}?name=${Uri.encodeComponent(contactName ?? 'Coleccionista')}&avatar=${Uri.encodeComponent(contactAvatar ?? 'https://ui-avatars.com/api/?name=C')}&contactId=$contactId');
-                  },
-                  icon: Icon(offer.status == 'completed' ? LucideIcons.checkCircle2 : LucideIcons.messageCircle, color: Colors.white, size: 20),
-                  label: Text(offer.status == 'completed' ? 'Ver Trato Finalizado' : 'Abrir Chat Seguro', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    elevation: 4,
-                    shadowColor: Colors.blueAccent.withOpacity(0.4),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        // Acción secundaria, tal vez ver perfil
+                      },
+                      icon: const Icon(LucideIcons.messageSquare, size: 16, color: Color(0xFF7C4DFF)),
+                      label: Text('Mensaje privado', style: GoogleFonts.poppins(color: const Color(0xFF7C4DFF), fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(color: Color(0xFF7C4DFF)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
                   ),
-                ),
-              )
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        final currentUserId = Supabase.instance.client.auth.currentUser!.id;
+                        final isMeOfferer = offer.offererId == currentUserId;
+                        final contactName = isMeOfferer ? offer.post?.username : offer.offererUsername;
+                        final contactAvatar = isMeOfferer ? offer.post?.userAvatar : offer.offererAvatar;
+                        final contactId = isMeOfferer ? offer.post?.userId : offer.offererId;
+
+                        context.push('/chat/${offer.id}?name=${Uri.encodeComponent(contactName ?? 'Coleccionista')}&avatar=${Uri.encodeComponent(contactAvatar ?? 'https://ui-avatars.com/api/?name=C')}&contactId=$contactId');
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(colors: [Color(0xFF00C2FF), Color(0xFF7C4DFF)]),
+                          boxShadow: [BoxShadow(color: const Color(0xFF7C4DFF).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(offer.status == 'completed' ? LucideIcons.checkCircle2 : LucideIcons.shieldCheck, color: Colors.white, size: 16),
+                            const SizedBox(width: 6),
+                            Text(offer.status == 'completed' ? 'Ver Trato' : 'Abrir Chat Seguro', style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ]
           ],
         ),
@@ -382,16 +612,24 @@ class _StatusBadge extends StatelessWidget {
     Color color = Colors.orange;
     Color bgColor = Colors.orange.withOpacity(0.15);
     String text = 'Pendiente';
+    IconData iconData = LucideIcons.clock;
 
-    if (status == 'accepted') { color = Colors.green; bgColor = Colors.green.withOpacity(0.15); text = 'Aceptado'; }
-    if (status == 'rejected') { color = Colors.red; bgColor = Colors.red.withOpacity(0.15); text = 'Rechazado'; }
-    if (status == 'completed') { color = Colors.blue; bgColor = Colors.blue.withOpacity(0.15); text = 'Completado'; }
-    if (status == 'cancelled') { color = Colors.grey; bgColor = Colors.grey.withOpacity(0.15); text = 'Cancelado'; }
+    if (status == 'accepted') { color = Colors.green; bgColor = Colors.green.withOpacity(0.15); text = 'Aceptado'; iconData = LucideIcons.checkCircle2; }
+    if (status == 'rejected') { color = Colors.red; bgColor = Colors.red.withOpacity(0.15); text = 'Rechazado'; iconData = LucideIcons.xCircle; }
+    if (status == 'completed') { color = Colors.blue; bgColor = Colors.blue.withOpacity(0.15); text = 'Completado'; iconData = LucideIcons.checkCircle2; }
+    if (status == 'cancelled') { color = Colors.grey; bgColor = Colors.grey.withOpacity(0.15); text = 'Cancelado'; iconData = LucideIcons.ban; }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
-      child: Text(text, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(iconData, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(text, style: GoogleFonts.poppins(color: color, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+        ],
+      ),
     );
   }
 }

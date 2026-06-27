@@ -65,7 +65,7 @@ class AnimeTradeApp extends HookConsumerWidget {
 
     return MaterialApp.router(
       title: 'TioSam Marketplace',
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

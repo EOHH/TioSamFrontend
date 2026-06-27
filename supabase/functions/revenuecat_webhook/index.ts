@@ -5,6 +5,15 @@ console.log("Iniciando Webhook de RevenueCat...");
 
 serve(async (req) => {
   try {
+    // 🛡️ PROTECCIÓN ANTI-HACKERS: Verificamos que la petición realmente venga de RevenueCat
+    const authHeader = req.headers.get('Authorization');
+    const webhookSecret = Deno.env.get('REVENUECAT_WEBHOOK_SECRET');
+
+    if (!webhookSecret || authHeader !== `Bearer ${webhookSecret}`) {
+      console.warn('⚠️ ALERTA DE SEGURIDAD: Intento de hackeo detectado (Firma inválida).');
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    }
+
     const body = await req.json();
     const event = body.event;
 

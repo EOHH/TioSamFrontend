@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../data/shop_repository.dart';
 import '../../domain/models/user_wallet.dart';
+import '../../../../core/services/analytics_service.dart';
 
 // Proveedor para obtener los paquetes reales de la tienda (Google Play / Apple Store)
 final storePackagesProvider = FutureProvider.autoDispose<List<Package>>((ref) async {
@@ -11,8 +12,9 @@ final storePackagesProvider = FutureProvider.autoDispose<List<Package>>((ref) as
 
 class ShopController extends StateNotifier<AsyncValue<UserWallet?>> {
   final ShopRepository _repository;
+  final AnalyticsService _analyticsService;
 
-  ShopController(this._repository) : super(const AsyncLoading()) {
+  ShopController(this._repository, this._analyticsService) : super(const AsyncLoading()) {
     loadWallet();
   }
 
@@ -27,6 +29,13 @@ class ShopController extends StateNotifier<AsyncValue<UserWallet?>> {
     state = const AsyncLoading();
     try {
       await _repository.buyGemsWithRealMoney(package);
+      
+      // 🔥 LOG DE ANALYTICS DE COMPRA EXITOSA
+      await _analyticsService.logGemPurchase(
+        packageId: package.identifier,
+        price: package.storeProduct.price,
+      );
+
       // Recargamos el estado (aunque el webhook puede tardar unos segundos)
       await loadWallet();
       return true;
@@ -103,5 +112,8 @@ class ShopController extends StateNotifier<AsyncValue<UserWallet?>> {
 
 // Proveedor global del controlador
 final shopControllerProvider = StateNotifierProvider.autoDispose<ShopController, AsyncValue<UserWallet?>>((ref) {
-  return ShopController(ref.watch(shopRepositoryProvider));
+  return ShopController(
+    ref.watch(shopRepositoryProvider),
+    ref.watch(analyticsServiceProvider),
+  );
 });

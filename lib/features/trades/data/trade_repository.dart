@@ -20,7 +20,7 @@ class TradeRepository {
   }
 
   // --- 2. CREAR PUBLICACIÓN (CON INTELIGENCIA VIP) ---
-  Future<void> createTrade({
+  Future<String> createTrade({
     required String offer,
     required String request,
     required String category,
@@ -56,7 +56,7 @@ class TradeRepository {
     }
 
     // ✅ Inserción limpia
-    await _client.from('trades').insert({
+    final response = await _client.from('trades').insert({
       'user_id': userId,
       'offer_item': offer,
       'request_item': request,
@@ -65,7 +65,9 @@ class TradeRepository {
       'image_url': imageUrl,
       'status': 'open',
       'is_boosted': false,
-    });
+    }).select('id').single();
+
+    return response['id'] as String;
   }
 }
 

@@ -43,10 +43,15 @@ class ShopRepository {
       // La compra fue exitosa. No actualizamos Supabase desde aquí.
     } on PlatformException catch (e) {
       var errorCode = PurchasesErrorHelper.getErrorCode(e);
-      if (errorCode != PurchasesErrorCode.purchaseCancelledError) {
-        throw Exception("Error en el pago: ${e.message}");
-      } else {
+      if (errorCode == PurchasesErrorCode.purchaseCancelledError) {
         throw Exception("Pago cancelado por el usuario.");
+      } else if (errorCode == PurchasesErrorCode.productAlreadyPurchasedError) {
+        // 🔥 MAGIA SENIOR: Si Google Play dice que ya lo tiene, forzamos una restauración
+        // Esto desbloquea compras "atascadas" en modo prueba o activa suscripciones vigentes.
+        await Purchases.restorePurchases();
+        throw Exception("Este producto ya estaba activo o atascado. Hemos sincronizado tu cuenta automáticamente. ¡Revisa tu saldo en unos segundos!");
+      } else {
+        throw Exception("Error en el pago: ${e.message}");
       }
     }
   }

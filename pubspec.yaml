@@ -2,7 +2,7 @@ name: anime_trade_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: ^3.8.1
@@ -36,6 +36,7 @@ dependencies:
   in_app_review: ^2.0.11
   timeago: ^3.7.1
   envied: ^1.3.5
+  firebase_analytics: ^12.4.3
 
 dev_dependencies:
   flutter_test:
@@ -54,12 +55,12 @@ flutter_icons:
   image_path: "assets/icon/app_icon_1024.png"
 
 flutter_native_splash:
-  color: "#0D0D0D"
-  image: assets/icon/app_icon_splash_1024.png
+  color: "#0B0F24"
+  image: assets/icon/app_icon_1024.png
 
   android_12:
-    image: assets/icon/app_icon_splash_1024.png
-    icon_background_color: "#0D0D0D"
+    image: assets/icon/app_icon_1024.png
+    icon_background_color: "#0B0F24"
 
 flutter:
   uses-material-design: true

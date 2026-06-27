@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
+import '../services/analytics_service.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
@@ -34,10 +36,14 @@ final authSubscriptionProvider = StreamProvider<AuthState>((ref) {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authSubscriptionProvider);
+  final analytics = ref.watch(analyticsServiceProvider).analytics;
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
+    observers: [
+      FirebaseAnalyticsObserver(analytics: analytics),
+    ],
 
     redirect: (context, state) {
       final session = ref.read(authRepositoryProvider).currentSession;

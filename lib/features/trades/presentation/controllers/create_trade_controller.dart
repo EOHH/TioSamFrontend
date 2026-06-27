@@ -4,13 +4,15 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../data/trade_repository.dart';
 import '../../data/storage_repository.dart'; // 👇 Importamos tu Storage
+import '../../../../core/services/analytics_service.dart';
 
 class CreateTradeController extends StateNotifier<AsyncValue<void>> {
   final TradeRepository _tradeRepository;
   final StorageRepository _storageRepository;
+  final AnalyticsService _analyticsService;
 
   // Recibimos AMBOS repositorios
-  CreateTradeController(this._tradeRepository, this._storageRepository) : super(const AsyncData(null));
+  CreateTradeController(this._tradeRepository, this._storageRepository, this._analyticsService) : super(const AsyncData(null));
 
   Future<bool> createTrade({
     required String offer,
@@ -36,13 +38,16 @@ class CreateTradeController extends StateNotifier<AsyncValue<void>> {
       }
 
       // 🔥 2. GUARDAMOS EN BASE DE DATOS
-      await _tradeRepository.createTrade(
+      final tradeId = await _tradeRepository.createTrade(
         offer: offer,
         request: request,
         category: category,
         description: description,
         imageUrl: finalImageUrl, // ¡Le pasamos la URL real a la BD!
       );
+      
+      // 🔥 3. REGISTRAMOS ANALYTICS
+      await _analyticsService.logTradeCreated(tradeId: tradeId);
     });
 
     state = result;
@@ -55,5 +60,6 @@ final createTradeControllerProvider = StateNotifierProvider<CreateTradeControlle
   return CreateTradeController(
     ref.watch(tradeRepositoryProvider),
     ref.watch(storageRepositoryProvider),
+    ref.watch(analyticsServiceProvider),
   );
 });

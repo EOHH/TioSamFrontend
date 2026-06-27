@@ -117,10 +117,29 @@ class MakeOfferModal extends HookConsumerWidget {
             ),
             const SizedBox(height: 24),
 
-            CustomInput(
+            TextField(
               controller: messageController,
-              label: "Mensaje de tu oferta (Ej: Te ofrezco mi carta X...)",
-              icon: LucideIcons.messageSquare,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                hintText: "Mensaje de tu oferta (Ej: Te ofrezco mi carta X...)",
+                hintStyle: TextStyle(color: Colors.grey.shade500),
+                prefixIcon: const Icon(LucideIcons.messageSquare, color: Colors.blueAccent),
+                filled: true,
+                fillColor: isDark ? Colors.grey.shade900 : const Color(0xFFF6F8FF),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
+                ),
+              ),
             ),
             const SizedBox(height: 32),
 
