@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart'; 
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../features/trades/domain/models/trade_post.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class OnboardingFeature {
